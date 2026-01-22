@@ -3,6 +3,7 @@ vendor/
 node_modules/
 .env
 config/email.php
-.gemini
-.agent
-.database
+.gemini/
+.agent/
+database/
+md/
