@@ -1,0 +1,51 @@
+# Prevent directory browsing
+Options -Indexes
+
+# Custom error pages
+ErrorDocument 403 /ojtlast/public/403.php
+
+# Enable URL rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect to login.php if accessing root directory
+    RewriteCond %{REQUEST_URI} ^/ojtlast/public/?$
+    RewriteRule ^(.*)$ login.php [L,R=302]
+    
+    # Block direct access to sensitive files
+    RewriteCond %{REQUEST_URI} \.(env|ini|log|sql|md)$ [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# Protect sensitive files
+<FilesMatch "\.(env|ini|log|sql|md|gitignore|htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow access to specific file types needed for the application
+<FilesMatch "\.(php|html|css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|pdf)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Security headers
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Enable XSS protection
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Referrer policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Disable server signature
+ServerSignature Off
+
+# Set default charset
+AddDefaultCharset UTF-8

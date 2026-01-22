@@ -1,0 +1,17 @@
+# Deny all direct access to images directory listing
+Options -Indexes
+
+# Custom error page
+ErrorDocument 403 /ojtlast/public/403.php
+
+# Allow access to image files only
+<FilesMatch "\.(png|jpg|jpeg|gif|svg|ico|webp)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Block access to any other file types
+<FilesMatch "^(?!.*\.(png|jpg|jpeg|gif|svg|ico|webp)$).*$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

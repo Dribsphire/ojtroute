@@ -1,0 +1,1185 @@
+<?php
+
+namespace App\Services;
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+class StudentService
+{
+    private $db;
+    private $config;
+
+    public function __construct()
+    {
+        // Load database configuration
+        $configPath = __DIR__ . '/../../config/database.php';
+        if (file_exists($configPath)) {
+            $this->config = require $configPath;
+        } else {
+            throw new \Exception('Database configuration file not found');
+        }
+
+        // Initialize database connection
+        $this->connect();
+    }
+
+    /**
+     * Get student DB ID from User ID
+     * @param int $userId
+     * @return int|false
+     */
+    public function getStudentDbId($userId)
+    {
+        $stmt = $this->db->prepare("SELECT id FROM students WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        return $stmt->fetchColumn();
+    }
+
+    /**
+     * Establish database connection
+     */
+    private function connect()
+    {
+        try {
+            $dsn = sprintf(
+                "mysql:host=%s;dbname=%s;charset=%s",
+                $this->config['host'],
+                $this->config['dbname'],
+                $this->config['charset']
+            );
+
+            $this->db = new \PDO(
+                $dsn,
+                $this->config['username'],
+                $this->config['password'],
+                $this->config['options']
+            );
+        } catch (\PDOException $e) {
+            throw new \Exception('Database connection failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get student profile data
+     * 
+     * @param int $studentId User ID from session
+     * @return array|null Student profile data or null if not found
+     */
+    public function getStudentProfile($studentId)
+    {
+        try {
+            // Get all admin users (OJT Chairpersons)
+            $adminStmt = $this->db->prepare("
+            SELECT 
+                id,
+                full_name,
+                CASE 
+                    WHEN profile_pic_path IS NULL THEN NULL
+                    WHEN profile_pic_path LIKE '../%' THEN profile_pic_path
+                    WHEN profile_pic_path LIKE 'storage/%' THEN CONCAT('../../', profile_pic_path)
+                    ELSE profile_pic_path
+                END as profile_pic_path
+            FROM users
+            WHERE role = 'admin' 
+            AND is_archived = 0
+            ORDER BY full_name ASC
+        ");
+            $adminStmt->execute();
+            $admins = $adminStmt->fetchAll(); // Get ALL admins
+
+            $stmt = $this->db->prepare("
+            SELECT 
+                u.id,
+                u.school_id,
+                u.full_name,
+                u.email,
+                u.contact,
+                u.facebook_name,
+                u.profile_pic_path,
+                u.year,
+                s.section_code,
+                s.section_name,
+                s.department,
+                instructor_user.full_name as instructor_name,
+                instructor_user.profile_pic_path as instructor_profile_pic,
+                COALESCE(students.target_ojt_hours, 600) as target_ojt_hours,
+                sw.company_name,
+                sw.company_head,
+                sw.company_address,
+                sw.position_title,
+                sw.workplace_latitude,
+                sw.workplace_longitude
+            FROM users u
+            LEFT JOIN sections s ON u.section_id = s.id
+            LEFT JOIN instructors ON s.instructor_id = instructors.id
+            LEFT JOIN users instructor_user ON instructors.user_id = instructor_user.id
+            LEFT JOIN students ON u.id = students.user_id
+            LEFT JOIN student_workplaces sw ON students.id = sw.student_id AND sw.is_active = 1
+            WHERE u.id = :student_id 
+            AND u.role = 'student'
+            AND u.is_archived = 0
+            LIMIT 1
+        ");
+
+            $stmt->execute([':student_id' => $studentId]);
+            $student = $stmt->fetch();
+
+            if (!$student) {
+                return null;
+            }
+
+            // Get OJT hours progress
+            $ojtHours = $this->getOJTHoursProgress($studentId);
+
+            // Build profile array
+            return [
+                'id' => $student['id'],
+                'school_id' => $student['school_id'],
+                'fullname' => $student['full_name'],
+                'email' => $student['email'],
+                'contact' => $student['contact'] ?: 'Not provided',
+                'facebook' => $student['facebook_name'] ?: 'Not provided',
+                'profile_pic' => $student['profile_pic_path'] ?: '../../storage/images/default_profile.jpg',
+                'section' => $student['section_name'] ?: 'Not assigned',
+                'department' => $student['department'] ?: 'Not assigned',
+                'year' => $student['year'] ?: 'Not specified',
+                'instructor' => $student['instructor_name'] ?: 'Not assigned',
+                'instructor_profile' => $student['instructor_profile_pic'] ?: '../../storage/images/default_profile.jpg',
+                'admins' => $admins, // Array of all admins
+                'workplace' => $student['company_name'] ?: 'Not assigned',
+                'supervisor' => $student['company_head'] ?: 'Not assigned',
+                'position' => $student['position_title'] ?: 'Intern',
+                'workplace_address' => $student['company_address'] ?? 'Not available',
+                'workplace_contact' => 'Not available', // No column in DB yet
+                'latitude' => $student['workplace_latitude'],
+                'longitude' => $student['workplace_longitude'],
+                'ojt_hours' => $ojtHours
+            ];
+        } catch (\PDOException $e) {
+            error_log('Get student profile error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get OJT hours progress for a student
+     * 
+     * @param int $userId User ID (from session)
+     * @return array OJT hours data
+     */
+    private function getOJTHoursProgress($userId)
+    {
+        try {
+            // Get completed hours from ojt_summaries
+            $stmt = $this->db->prepare("
+                SELECT 
+                    os.hours_completed,
+                    os.last_updated,
+                    COALESCE(s.target_ojt_hours, 600) as target_hours
+                FROM users u
+                JOIN students s ON u.id = s.user_id
+                LEFT JOIN ojt_summaries os ON s.id = os.student_id
+                WHERE u.id = :user_id
+            ");
+
+            $stmt->execute([':user_id' => $userId]);
+            $result = $stmt->fetch();
+
+            $completed = $result['hours_completed'] ? floatval($result['hours_completed']) : 0;
+            $total = $result['target_hours'] ? floatval($result['target_hours']) : 600;
+            $lastUpdated = isset($result['last_updated']) ? date('Y-m-d', strtotime($result['last_updated'])) : date('Y-m-d');
+
+            // Calculate progress percentage
+            // CRITICAL FIX: Cap progress at 100% to prevent UI overflow
+            $progress = $total > 0 ? min(100, round(($completed / $total) * 100, 2)) : 0;
+
+            return [
+                'completed' => $completed,
+                'total' => $total,
+                'last_updated' => $lastUpdated,
+                'progress' => $progress
+            ];
+        } catch (\PDOException $e) {
+            error_log('Get OJT hours error: ' . $e->getMessage());
+            return [
+                'completed' => 0,
+                'total' => 600,
+                'last_updated' => date('Y-m-d'),
+                'progress' => 0
+            ];
+        }
+    }
+
+    /**
+     * Update student profile
+     * 
+     * @param int $studentId Student ID
+     * @param array $data Profile data to update
+     * @return bool Success status
+     */
+    public function updateStudentProfile($studentId, $data)
+    {
+        try {
+            $allowedFields = ['email', 'contact', 'facebook_name'];
+            $updateFields = [];
+            $updateValues = [':student_id' => $studentId];
+
+            foreach ($allowedFields as $field) {
+                if (isset($data[$field])) {
+                    $updateFields[] = "$field = :$field";
+                    $updateValues[":$field"] = $data[$field];
+                }
+            }
+
+            if (empty($updateFields)) {
+                return false; // No valid fields to update
+            }
+
+            $sql = "UPDATE users SET " . implode(', ', $updateFields) . " WHERE id = :student_id AND role = 'student'";
+            $stmt = $this->db->prepare($sql);
+
+            return $stmt->execute($updateValues);
+        } catch (\PDOException $e) {
+            error_log('Update student profile error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update student profile picture
+     * 
+     * @param int $studentId Student ID
+     * @param string $profilePicPath Path to profile picture
+     * @return bool Success status
+     */
+    public function updateProfilePicture($studentId, $profilePicPath)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE users 
+                SET profile_pic_path = :profile_pic_path 
+                WHERE id = :student_id 
+                AND role = 'student'
+            ");
+
+            return $stmt->execute([
+                ':profile_pic_path' => $profilePicPath,
+                ':student_id' => $studentId
+            ]);
+        } catch (\PDOException $e) {
+            error_log('Update profile picture error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Submit workplace change request
+     * 
+     * @param int $studentId Student ID
+     * @param array $workplaceData Workplace information
+     * @return bool Success status
+     */
+    public function submitWorkplaceChangeRequest($studentId, $workplaceData)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO workplace_change_requests (
+                    student_id, 
+                    workplace_name, 
+                    workplace_address,
+                    position_title,
+                    supervisor_name, 
+                    latitude, 
+                    longitude, 
+                    change_reason, 
+                    status, 
+                    created_at
+                ) VALUES (
+                    :student_id,
+                    :workplace_name,
+                    :workplace_address,
+                    :position_title,
+                    :supervisor_name,
+                    :latitude,
+                    :longitude,
+                    :change_reason,
+                    'pending',
+                    NOW()
+                )
+            ");
+
+            return $stmt->execute([
+                ':student_id' => $studentId,
+                ':workplace_name' => $workplaceData['workplace_name'],
+                ':workplace_address' => $workplaceData['workplace_address'],
+                ':position_title' => $workplaceData['position'] ?? '',
+                ':supervisor_name' => $workplaceData['supervisor_name'] ?? '',
+                ':latitude' => $workplaceData['latitude'],
+                ':longitude' => $workplaceData['longitude'],
+                ':change_reason' => $workplaceData['change_reason']
+            ]);
+        } catch (\PDOException $e) {
+            error_log('Submit workplace change request error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update active workplace details
+     * 
+     * @param int $studentId Student ID (users.id, convert to students.id)
+     * @param array $data Data to update
+     * @return bool
+     */
+    public function updateActiveWorkplace($userId, $data)
+    {
+        try {
+            // Get student DB ID first
+            $stmt = $this->db->prepare("SELECT id FROM students WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $studentDbId = $stmt->fetchColumn();
+
+            if (!$studentDbId)
+                return false;
+
+            // Check if active workplace exists
+            $stmt = $this->db->prepare("SELECT id FROM student_workplaces WHERE student_id = ? AND is_active = 1");
+            $stmt->execute([$studentDbId]);
+            $existingId = $stmt->fetchColumn();
+
+            $allowed = ['company_name', 'company_head', 'position_title', 'workplace_latitude', 'workplace_longitude', 'company_address'];
+
+            if ($existingId) {
+                // UPDATE existing record
+                $fields = [];
+                $values = [':id' => $existingId];
+
+                foreach ($allowed as $field) {
+                    if (isset($data[$field])) {
+                        $fields[] = "$field = :$field";
+                        $values[":$field"] = $data[$field];
+                    }
+                }
+
+                if (empty($fields))
+                    return true; // Nothing to update
+
+                $sql = "UPDATE student_workplaces 
+                        SET " . implode(', ', $fields) . " 
+                        WHERE id = :id";
+
+                $stmt = $this->db->prepare($sql);
+                return $stmt->execute($values);
+            } else {
+                // INSERT new record (Active)
+                // company_name is required
+                if (empty($data['company_name'])) {
+                    return false;
+                }
+
+                $cols = ['student_id', 'is_active', 'start_date'];
+                $placeholders = [':student_id', '1', 'CURDATE()'];
+                $values = [':student_id' => $studentDbId];
+
+                foreach ($allowed as $field) {
+                    if (isset($data[$field])) {
+                        $cols[] = $field;
+                        $placeholders[] = ":$field";
+                        $values[":$field"] = $data[$field];
+                    }
+                }
+
+                $sql = "INSERT INTO student_workplaces (" . implode(', ', $cols) . ") 
+                        VALUES (" . implode(', ', $placeholders) . ")";
+
+                $stmt = $this->db->prepare($sql);
+                return $stmt->execute($values);
+            }
+        } catch (\PDOException $e) {
+            error_log('Update workplace error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if student has already set up their workplace
+     * 
+     * @param int $userId User ID from session
+     * @return bool True if workplace exists, false otherwise
+     */
+    public function hasWorkplace($userId)
+    {
+        try {
+            // Get student DB ID first
+            $stmt = $this->db->prepare("SELECT id FROM students WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $studentDbId = $stmt->fetchColumn();
+
+            if (!$studentDbId)
+                return false;
+
+            // Check if active workplace exists
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM student_workplaces WHERE student_id = ? AND is_active = 1");
+            $stmt->execute([$studentDbId]);
+            $count = $stmt->fetchColumn();
+
+            return $count > 0;
+        } catch (\PDOException $e) {
+            error_log('Check workplace error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get database connection
+     * 
+     * @return \PDO
+     */
+    public function getDb()
+    {
+        return $this->db;
+    }
+    /**
+     * Get all document requirements and student's submission status
+     * Only shows documents created by the student's instructor OR system-wide documents
+     * @param int $userId
+     * @return array
+     */
+    public function getStudentDocuments($userId)
+    {
+        try {
+            // Get student ID and section instructor
+            $stmt = $this->db->prepare("
+                SELECT s.id, u.section_id, sec.instructor_id 
+                FROM students s
+                JOIN users u ON s.user_id = u.id
+                LEFT JOIN sections sec ON u.section_id = sec.id
+                WHERE s.user_id = ?
+            ");
+            $stmt->execute([$userId]);
+            $studentData = $stmt->fetch();
+
+            if (!$studentData)
+                return [];
+
+            $studentId = $studentData['id'];
+            $instructorId = $studentData['instructor_id'];
+
+
+            // Fetch document types created by student's instructor OR system-wide (NULL instructor_id)
+            // Left join with student's submissions
+            $sql = "
+                SELECT 
+                    dt.id as document_type_id,
+                    dt.name,
+                    dt.code,
+                    dt.category,
+                    dt.is_pre_required,
+                    dt.template_path,
+                    dt.instructor_id,
+                    dt.deadline,
+                    ds.id as submission_id,
+                    ds.status,
+                    ds.submitted_at,
+                    ds.file_path,
+                    ds.feedback
+                FROM document_types dt
+                LEFT JOIN document_submissions ds ON dt.id = ds.document_type_id AND ds.student_id = :student_id
+                WHERE dt.is_active = 1
+                AND (dt.instructor_id = :instructor_id OR dt.instructor_id IS NULL)
+                ORDER BY dt.is_pre_required DESC, dt.created_at ASC
+            ";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':student_id' => $studentId,
+                ':instructor_id' => $instructorId
+            ]);
+            return $stmt->fetchAll();
+
+        } catch (\PDOException $e) {
+            error_log('Get student documents error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get count of new documents uploaded by instructor in the last 7 days
+     * @param int $userId
+     * @return int Count of new documents
+     */
+    public function getNewDocumentsCount($userId)
+    {
+        try {
+            // Get student's instructor
+            $stmt = $this->db->prepare("
+                SELECT sec.instructor_id 
+                FROM students s
+                JOIN users u ON s.user_id = u.id
+                LEFT JOIN sections sec ON u.section_id = sec.id
+                WHERE s.user_id = ?
+            ");
+            $stmt->execute([$userId]);
+            $data = $stmt->fetch();
+
+            if (!$data || !$data['instructor_id']) {
+                return 0;
+            }
+
+            $instructorId = $data['instructor_id'];
+
+            // Count documents created by instructor in last 7 days
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM document_types 
+                WHERE instructor_id = :instructor_id 
+                AND is_active = 1
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ");
+            $stmt->execute([':instructor_id' => $instructorId]);
+
+            return (int) $stmt->fetchColumn();
+
+        } catch (\PDOException $e) {
+            error_log('Get new documents count error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Check if student serves attendance requirements
+     * @param int $studentId
+     * @return array ['allowed' => bool, 'message' => string]
+     */
+    public function checkAttendanceEligibility($studentId)
+    {
+        // Check Workplace
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM student_workplaces WHERE student_id = ? AND is_active = 1");
+        $stmt->execute([$studentId]);
+        if ($stmt->fetchColumn() == 0) {
+            return ['allowed' => false, 'message' => 'You must set your Workplace Location in your Profile before tracking attendance.'];
+        }
+
+        // Get student's instructor ID
+        $stmt = $this->db->prepare("
+            SELECT sec.instructor_id 
+            FROM students s
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN sections sec ON u.section_id = sec.id
+            WHERE s.id = ?
+        ");
+        $stmt->execute([$studentId]);
+        $instructorData = $stmt->fetch();
+        $instructorId = $instructorData['instructor_id'] ?? null;
+
+        // Check Pre-Required Documents (only for student's instructor OR system-wide)
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) 
+            FROM document_types 
+            WHERE is_pre_required = 1 
+            AND is_active = 1
+            AND (instructor_id = :instructor_id OR instructor_id IS NULL)
+        ");
+        $stmt->execute([':instructor_id' => $instructorId]);
+        $totalPreReqs = $stmt->fetchColumn();
+
+        if ($totalPreReqs > 0) {
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT dt.id)
+                FROM document_submissions ds
+                JOIN document_types dt ON ds.document_type_id = dt.id
+                WHERE ds.student_id = :student_id 
+                  AND dt.is_pre_required = 1 
+                  AND dt.is_active = 1
+                  AND (dt.instructor_id = :instructor_id OR dt.instructor_id IS NULL)
+                  AND ds.status = 'approved'
+            ");
+            $stmt->execute([
+                ':student_id' => $studentId,
+                ':instructor_id' => $instructorId
+            ]);
+            $approvedPreReqs = $stmt->fetchColumn();
+
+            if ($approvedPreReqs < $totalPreReqs) {
+                return ['allowed' => false, 'message' => 'You must submit and have all Pre-Required Documents approved before tracking attendance.'];
+            }
+        }
+
+        return ['allowed' => true];
+    }
+
+    /**
+     * Upload a document submission
+     * @param int $userId
+     * @param int $documentTypeId
+     * @param array $file
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function uploadDocument($userId, $documentTypeId, $file)
+    {
+        try {
+            // Get student ID
+            $stmt = $this->db->prepare("SELECT id FROM students WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $studentId = $stmt->fetchColumn();
+            if (!$studentId)
+                return ['success' => false, 'message' => 'Student not found'];
+
+            // Validation
+            $allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
+            if (!in_array($file['type'], $allowed))
+                return ['success' => false, 'message' => 'Invalid file type. URL: ' . $file['type']]; // Improved error
+            if ($file['size'] > 10 * 1024 * 1024)
+                return ['success' => false, 'message' => 'File too large (Max 10MB).'];
+
+            // Upload
+            $dir = __DIR__ . '/../../storage/uploads/student_docs/';
+            if (!is_dir($dir))
+                mkdir($dir, 0755, true);
+
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = 'doc_' . $studentId . '_' . $documentTypeId . '_' . time() . '.' . $ext;
+            if (!move_uploaded_file($file['tmp_name'], $dir . $filename)) {
+                return ['success' => false, 'message' => 'Upload failed'];
+            }
+
+            $dbPath = '../../storage/uploads/student_docs/' . $filename;
+
+            // Check if exists
+            $check = $this->db->prepare("SELECT id FROM document_submissions WHERE student_id = ? AND document_type_id = ?");
+            $check->execute([$studentId, $documentTypeId]);
+            $exists = $check->fetchColumn();
+
+            if ($exists) {
+                // Update
+                $stmt = $this->db->prepare("UPDATE document_submissions SET file_path = ?, status = 'pending', submitted_at = NOW() WHERE id = ?");
+                $stmt->execute([$dbPath, $exists]);
+            } else {
+                // Insert
+                $stmt = $this->db->prepare("INSERT INTO document_submissions (student_id, document_type_id, file_path, status, submitted_at) VALUES (?, ?, ?, 'pending', NOW())");
+                $stmt->execute([$studentId, $documentTypeId, $dbPath]);
+            }
+
+            return ['success' => true, 'message' => 'Document submitted successfully'];
+
+        } catch (\PDOException $e) {
+            error_log('Upload document error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Database error'];
+        }
+    }
+    public function recordAttendance($studentId, $blockType, $lat, $lng, $photoData)
+    {
+        // 1. Get Student Workplace Coords
+        $stmt = $this->db->prepare("
+            SELECT workplace_latitude, workplace_longitude 
+            FROM student_workplaces 
+            WHERE student_id = ? 
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([$studentId]);
+        $workplace = $stmt->fetch();
+        if (!$workplace) {
+            return ['success' => false, 'message' => 'No workplace assigned.'];
+        }
+
+        // 2. Calculate Distance
+        $distance = $this->calculateDistance($lat, $lng, $workplace['workplace_latitude'], $workplace['workplace_longitude']);
+
+        // Strict restriction: Allow up to 60 meters (covering the "50-60 meter" exception)
+        if ($distance > 60) {
+            return [
+                'success' => false,
+                'message' => 'You are too far from your workplace to time in. Maximum allowed distance is 60 meters. Current distance: ' . round($distance) . 'm.'
+            ];
+        }
+
+        $withinRadius = 1; // Considered within allowed radius since we rejected > 60
+
+        // 3. Save Image
+        if (preg_match('/^data:image\/(\w+);base64,/', $photoData, $type)) {
+            $data = substr($photoData, strpos($photoData, ',') + 1);
+            $type = strtolower($type[1]); // jpg, png, gif
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+                return ['success' => false, 'message' => 'Invalid image type'];
+            }
+            $data = base64_decode($data);
+            if ($data === false) {
+                return ['success' => false, 'message' => 'Base64 decode failed'];
+            }
+        } else {
+            return ['success' => false, 'message' => 'Invalid image data'];
+        }
+
+        $dir = __DIR__ . '/../../storage/uploads/attendance_images/';
+        if (!is_dir($dir))
+            mkdir($dir, 0755, true);
+
+        $filename = 'att_' . $studentId . '_' . date('Ymd_His') . '.' . $type;
+        file_put_contents($dir . $filename, $data);
+        $photoPath = '../../storage/uploads/attendance_images/' . $filename;
+
+        // 4. Insert Record
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO attendance_records 
+                (student_id, attendance_date, block_type, time_in, time_in_latitude, time_in_longitude, within_radius, photo_path, status)
+                VALUES 
+                (:sid, CURDATE(), :block, NOW(), :lat, :lng, :wr, :path, 'ongoing')
+            ");
+            $stmt->execute([
+                ':sid' => $studentId,
+                ':block' => $blockType,
+                ':lat' => $lat,
+                ':lng' => $lng,
+                ':wr' => $withinRadius,
+                ':path' => $photoPath
+            ]);
+
+            $msg = 'Time in recorded successfully';
+            if ($distance > 40) {
+                $msg .= ' (Note: You are ' . round($distance) . 'm away, which is within the extended 60m allowance)';
+            }
+
+            return ['success' => true, 'message' => $msg, 'within_radius' => $withinRadius];
+        } catch (\PDOException $e) {
+            if ($e->getCode() == 23000) {
+                return ['success' => false, 'message' => 'You have already timed in for this block today.'];
+            }
+            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Record Time Out for a student
+     * @param int $studentId
+     * @param string $blockType
+     * @return array ['success' => bool, 'message' => string, 'hours_worked' => float]
+     */
+    public function recordTimeOut($studentId, $blockType)
+    {
+        // CRITICAL FIX: Wrap entire operation in transaction to prevent race conditions
+        $this->db->beginTransaction();
+
+        try {
+            // 1. Get existing attendance record with row lock to prevent concurrent modifications
+            $stmt = $this->db->prepare("
+                SELECT id, time_in, time_out, status, block_type, attendance_date
+                FROM attendance_records 
+                WHERE student_id = ? 
+                AND attendance_date = CURDATE() 
+                AND block_type = ?
+                FOR UPDATE
+            ");
+            $stmt->execute([$studentId, $blockType]);
+            $record = $stmt->fetch();
+
+            if (!$record) {
+                $this->db->rollBack();
+                return ['success' => false, 'message' => 'No Time In record found for this block today.'];
+            }
+
+            if ($record['time_out']) {
+                $this->db->rollBack();
+                return ['success' => false, 'message' => 'You have already timed out for this block.'];
+            }
+
+            // 2. Check if block period has ended
+            $blockEndTimes = [
+                'morning' => '12:00:00',
+                'afternoon' => '18:00:00',
+                'overtime' => '22:00:00'
+            ];
+
+            $blockEndTime = $blockEndTimes[$blockType] ?? null;
+            if (!$blockEndTime) {
+                $this->db->rollBack();
+                return ['success' => false, 'message' => 'Invalid block type.'];
+            }
+
+            // Get current time in Asia/Manila timezone
+            $currentDateTime = new \DateTime('now', new \DateTimeZone('Asia/Manila'));
+            $currentTime = $currentDateTime->format('H:i:s');
+            $currentDate = $currentDateTime->format('Y-m-d');
+
+            // Check if we're past the block end time
+            if (
+                $currentDate > $record['attendance_date'] ||
+                ($currentDate === $record['attendance_date'] && $currentTime > $blockEndTime)
+            ) {
+                $this->db->rollBack();
+                return [
+                    'success' => false,
+                    'message' => 'Block period has ended. You cannot time out after the block has ended. Please submit a missing timeout request in the "Missing Timeouts" page.'
+                ];
+            }
+
+            // 3. CRITICAL FIX: Calculate hours with maximum cap to prevent overflow
+            // Update attendance record with time_out and calculate hours using MySQL
+            $stmt = $this->db->prepare("
+                UPDATE attendance_records 
+                SET time_out = NOW(), 
+                    status = 'completed',
+                    hours = LEAST(TIMESTAMPDIFF(SECOND, time_in, NOW()) / 3600, 12.0)
+                WHERE id = ?
+            ");
+            $stmt->execute([$record['id']]);
+
+            // Get the calculated hours from the database
+            $stmt = $this->db->prepare("
+                SELECT hours 
+                FROM attendance_records 
+                WHERE id = ?
+            ");
+            $stmt->execute([$record['id']]);
+            $updatedRecord = $stmt->fetch();
+            $hoursWorked = round($updatedRecord['hours'], 2);
+
+            // CRITICAL FIX: Validate hours before proceeding
+            if ($hoursWorked > 12) {
+                // This should never happen due to LEAST() above, but double-check
+                $this->db->rollBack();
+                error_log("CRITICAL: Hours overflow detected for student {$studentId}, block {$blockType}: {$hoursWorked} hours");
+                return [
+                    'success' => false,
+                    'message' => 'Invalid hours detected (maximum 12 hours per block). Please contact your instructor or administrator.'
+                ];
+            }
+
+            // Log warning for unusually high hours (but still valid)
+            if ($hoursWorked > 8) {
+                error_log("WARNING: High hours detected for student {$studentId}, block {$blockType}: {$hoursWorked} hours");
+            }
+
+            // 4. Update ojt_summaries table with row lock to prevent race conditions
+            $stmt = $this->db->prepare("
+                SELECT id, hours_completed 
+                FROM ojt_summaries 
+                WHERE student_id = ?
+                FOR UPDATE
+            ");
+            $stmt->execute([$studentId]);
+            $summary = $stmt->fetch();
+
+            if ($summary) {
+                // Update existing record
+                $newTotal = $summary['hours_completed'] + $hoursWorked;
+
+                // CRITICAL FIX: Validate total hours don't exceed reasonable maximum (1000 hours)
+                if ($newTotal > 1000) {
+                    $this->db->rollBack();
+                    error_log("CRITICAL: Total hours overflow detected for student {$studentId}: {$newTotal} hours");
+                    return [
+                        'success' => false,
+                        'message' => 'Total hours limit exceeded. Please contact your administrator.'
+                    ];
+                }
+
+                $stmt = $this->db->prepare("
+                    UPDATE ojt_summaries 
+                    SET hours_completed = ?, last_updated = NOW()
+                    WHERE student_id = ?
+                ");
+                $stmt->execute([$newTotal, $studentId]);
+            } else {
+                // Insert new record using INSERT ... ON DUPLICATE KEY UPDATE for safety
+                $stmt = $this->db->prepare("
+                    INSERT INTO ojt_summaries (student_id, hours_completed, last_updated)
+                    VALUES (?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE 
+                        hours_completed = hours_completed + VALUES(hours_completed),
+                        last_updated = NOW()
+                ");
+                $stmt->execute([$studentId, $hoursWorked]);
+            }
+
+            // CRITICAL FIX: Commit transaction only if all operations succeeded
+            $this->db->commit();
+
+            return [
+                'success' => true,
+                'message' => "Time Out recorded successfully. You worked for {$hoursWorked} hours.",
+                'hours_worked' => $hoursWorked
+            ];
+
+        } catch (\PDOException $e) {
+            // CRITICAL FIX: Rollback transaction on any error
+            $this->db->rollBack();
+            error_log('Record time out error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Database error occurred. Please try again.'];
+        } catch (\Exception $e) {
+            // Catch any other exceptions
+            $this->db->rollBack();
+            error_log('Unexpected error in recordTimeOut: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'An unexpected error occurred. Please try again.'];
+        }
+    }
+
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000;
+        $lat1 = deg2rad($lat1);
+        $lon1 = deg2rad($lon1);
+        $lat2 = deg2rad($lat2);
+        $lon2 = deg2rad($lon2);
+        $dLat = $lat2 - $lat1;
+        $dLon = $lon2 - $lon1;
+        $a = sin($dLat / 2) * sin($dLat / 2) + cos($lat1) * cos($lat2) * sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earthRadius * $c;
+    }
+    /**
+     * Get today's attendance records for a student
+     * @param int $studentId
+     * @return array
+     */
+    public function getTodayAttendance($studentId)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT block_type, time_in, time_out, status, within_radius
+                FROM attendance_records
+                WHERE student_id = ? AND attendance_date = CURDATE()
+            ");
+            $stmt->execute([$studentId]);
+            return $stmt->fetchAll();
+        } catch (\PDOException $e) {
+            error_log('Get today attendance error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getMissingTimeouts($studentId)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT *, 
+                       attendance_date, 
+                       time_in, 
+                       block_type,
+                       forgot_timeout_reason as reason,
+                       forgot_timeout_file as letter_file_path,
+                       request_status as status,
+                       instructor_response
+                FROM attendance_records 
+                WHERE student_id = ? 
+                AND (
+                    time_out IS NULL
+                    OR request_status IS NOT NULL
+                    OR missing_timeout_flagged_at IS NOT NULL
+                )
+                ORDER BY attendance_date DESC, block_type ASC
+            ");
+            $stmt->execute([$studentId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return [];
+        }
+    }
+
+    public function submitTimeoutRequest($studentId, $recordId, $reason, $file)
+    {
+        try {
+            // Verify record belongs to student
+            $stmt = $this->db->prepare("SELECT id FROM attendance_records WHERE id = ? AND student_id = ?");
+            $stmt->execute([$recordId, $studentId]);
+            if (!$stmt->fetch()) {
+                return ['success' => false, 'message' => 'Record not found.'];
+            }
+
+            $filePath = null;
+            if ($file && $file['error'] === UPLOAD_ERR_OK) {
+                // Save to public/uploads/documents/
+                $uploadDir = __DIR__ . '/../../public/uploads/documents/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $filename = 'timeout_req_' . $recordId . '_' . time() . '.' . $extension;
+                $targetPath = $uploadDir . $filename;
+
+                if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                    // Path relative to public/student/ (where the calling script is)
+                    $filePath = '../uploads/documents/' . $filename;
+                } else {
+                    return ['success' => false, 'message' => 'Failed to upload file.'];
+                }
+            }
+
+            $sql = "UPDATE attendance_records SET request_status = 'pending', forgot_timeout_reason = ?";
+            $params = [$reason];
+
+            if ($filePath) {
+                $sql .= ", forgot_timeout_file = ?";
+                $params[] = $filePath;
+            }
+
+            $sql .= " WHERE id = ?";
+            $params[] = $recordId;
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+
+            return ['success' => true, 'message' => 'Request submitted successfully.'];
+
+        } catch (\PDOException $e) {
+            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Calculate hours for missing timeout based on block end time
+     * @param int $recordId
+     * @return array
+     */
+    public function calculateMissingTimeoutHours($recordId)
+    {
+        try {
+            // Get the record
+            $stmt = $this->db->prepare("
+                SELECT id, time_in, block_type, attendance_date 
+                FROM attendance_records 
+                WHERE id = ?
+            ");
+            $stmt->execute([$recordId]);
+            $record = $stmt->fetch();
+
+            if (!$record) {
+                return ['success' => false, 'message' => 'Record not found.'];
+            }
+
+            // Define block end times
+            $blockEndTimes = [
+                'morning' => '12:00:00',
+                'afternoon' => '18:00:00',
+                'overtime' => '22:00:00'
+            ];
+
+            $blockType = $record['block_type'];
+            if (!isset($blockEndTimes[$blockType])) {
+                return ['success' => false, 'message' => 'Invalid block type.'];
+            }
+
+            // Construct the assumed time_out using attendance_date + block end time
+            $assumedTimeOut = $record['attendance_date'] . ' ' . $blockEndTimes[$blockType];
+
+            // Calculate hours using MySQL TIMESTAMPDIFF
+            $stmt = $this->db->prepare("
+                UPDATE attendance_records 
+                SET time_out = ?,
+                    hours = TIMESTAMPDIFF(SECOND, time_in, ?) / 3600,
+                    status = 'completed'
+                WHERE id = ?
+            ");
+            $stmt->execute([$assumedTimeOut, $assumedTimeOut, $recordId]);
+
+            // Get the calculated hours
+            $stmt = $this->db->prepare("SELECT hours FROM attendance_records WHERE id = ?");
+            $stmt->execute([$recordId]);
+            $updated = $stmt->fetch();
+            $hoursWorked = round($updated['hours'], 2);
+
+            return [
+                'success' => true,
+                'hours_worked' => $hoursWorked,
+                'assumed_time_out' => $assumedTimeOut
+            ];
+
+        } catch (\PDOException $e) {
+            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Approve timeout request and calculate hours
+     * @param int $recordId
+     * @param string $instructorResponse
+     * @return array
+     */
+    public function approveTimeoutRequest($recordId, $instructorResponse = '')
+    {
+        try {
+            // Calculate hours based on block end time
+            $result = $this->calculateMissingTimeoutHours($recordId);
+
+            if (!$result['success']) {
+                return $result;
+            }
+
+            $hoursWorked = $result['hours_worked'];
+
+            // Get student_id for updating ojt_summaries
+            $stmt = $this->db->prepare("SELECT student_id FROM attendance_records WHERE id = ?");
+            $stmt->execute([$recordId]);
+            $record = $stmt->fetch();
+            $studentId = $record['student_id'];
+
+            // Update request status to approved
+            $stmt = $this->db->prepare("
+                UPDATE attendance_records 
+                SET request_status = 'approved',
+                    instructor_response = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$instructorResponse ?: 'Approved. Hours calculated based on block end time.', $recordId]);
+
+            // Update ojt_summaries
+            $stmt = $this->db->prepare("
+                SELECT id, hours_completed 
+                FROM ojt_summaries 
+                WHERE student_id = ?
+            ");
+            $stmt->execute([$studentId]);
+            $summary = $stmt->fetch();
+
+            if ($summary) {
+                $newTotal = $summary['hours_completed'] + $hoursWorked;
+                $stmt = $this->db->prepare("
+                    UPDATE ojt_summaries 
+                    SET hours_completed = ?, last_updated = NOW()
+                    WHERE student_id = ?
+                ");
+                $stmt->execute([$newTotal, $studentId]);
+            } else {
+                $stmt = $this->db->prepare("
+                    INSERT INTO ojt_summaries (student_id, hours_completed, last_updated)
+                    VALUES (?, ?, NOW())
+                ");
+                $stmt->execute([$studentId, $hoursWorked]);
+            }
+
+            return [
+                'success' => true,
+                'message' => "Request approved. {$hoursWorked} hours added to student's total.",
+                'hours_worked' => $hoursWorked
+            ];
+
+        } catch (\PDOException $e) {
+            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Reject timeout request
+     * @param int $recordId
+     * @param string $instructorResponse
+     * @return array
+     */
+    public function rejectTimeoutRequest($recordId, $instructorResponse = '')
+    {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE attendance_records 
+                SET request_status = 'rejected',
+                    instructor_response = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$instructorResponse ?: 'Request rejected.', $recordId]);
+
+            return ['success' => true, 'message' => 'Request rejected.'];
+
+        } catch (\PDOException $e) {
+            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        }
+    }
+}

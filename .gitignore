@@ -1,0 +1,5 @@
+leaflet-mcp-server/
+vendor/
+node_modules/
+.env
+config/email.php

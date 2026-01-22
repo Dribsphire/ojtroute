@@ -1,0 +1,29 @@
+# Deny all access to database directory
+# This directory contains sensitive SQL files, migrations, and database schemas
+
+# Deny all HTTP access
+Order Deny,Allow
+Deny from all
+
+# Alternative method - return 403 Forbidden
+<FilesMatch ".*">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Block directory listing
+Options -Indexes
+
+# Prevent access to all file types
+<Files "*">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+# Custom error page
+ErrorDocument 403 /ojtlast/public/403.php
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
