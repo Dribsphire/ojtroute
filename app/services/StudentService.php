@@ -101,6 +101,7 @@ class StudentService
                 s.section_name,
                 s.department,
                 instructor_user.full_name as instructor_name,
+                instructor_user.email as instructor_email,
                 instructor_user.profile_pic_path as instructor_profile_pic,
                 COALESCE(students.target_ojt_hours, 600) as target_ojt_hours,
                 sw.company_name,
@@ -144,6 +145,7 @@ class StudentService
                 'department' => $student['department'] ?: 'Not assigned',
                 'year' => $student['year'] ?: 'Not specified',
                 'instructor' => $student['instructor_name'] ?: 'Not assigned',
+                'instructor_email' => $student['instructor_email'] ?: 'Not available',
                 'instructor_profile' => $student['instructor_profile_pic'] ?: '../../storage/images/default_profile.jpg',
                 'admins' => $admins, // Array of all admins
                 'workplace' => $student['company_name'] ?: 'Not assigned',

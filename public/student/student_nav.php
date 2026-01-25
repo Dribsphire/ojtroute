@@ -97,7 +97,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <i class="fas fa-times"></i>
                 Cancel
             </button>
-            <a href="../logout.php" class="btn btn-logout-confirm" style="width: 15.2rem;">
+            <a href="../logout.php" class="btn btn-logout-confirm">
                 <i class="fas fa-sign-out-alt"></i>
                 Logout
             </a>
@@ -163,15 +163,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
     }
 
     .logout-modal-footer {
-        padding: 1rem;
+        padding: 1.5rem;
         background: #f8f9fa;
         display: flex;
         gap: 1rem;
         justify-content: center;
-        flex-wrap: wrap;
+        align-items: center;
     }
 
-    .btn {
+    .logout-modal-footer .btn {
+        flex: 1;
+        max-width: 200px;
+        min-width: 120px;
         padding: 0.75rem 1.5rem;
         border: none;
         border-radius: 8px;
@@ -179,10 +182,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         text-decoration: none;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 0.5rem;
         cursor: pointer;
         transition: all 0.3s ease;
         font-size: 1rem;
+        text-align: center;
     }
 
     .btn-cancel {
@@ -237,11 +242,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         .logout-modal-footer {
             flex-direction: column;
+            padding: 1rem;
         }
 
-        .btn {
+        .logout-modal-footer .btn {
             width: 100%;
-            justify-content: center;
+            max-width: 100%;
+            min-width: 100%;
         }
     }
 </style>

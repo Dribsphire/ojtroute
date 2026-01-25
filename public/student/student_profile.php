@@ -503,11 +503,13 @@ require_once 'student_nav.php';
             height: 100%;
             background-color: rgba(0, 0, 0, 0.8);
             animation: fadeIn 0.3s ease;
+            overflow-y: auto;
+            padding: 2rem 0;
         }
 
         .modal.show {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
         }
 
@@ -518,9 +520,32 @@ require_once 'student_nav.php';
             padding: 2rem;
             width: 90%;
             max-width: 500px;
+            max-height: calc(100vh - 4rem);
             position: relative;
             animation: slideIn 0.3s ease;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+            margin: auto;
+            scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar for modal */
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: var(--base-clr);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: var(--accent-clr);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #15a517;
         }
 
         .modal-header {
@@ -696,6 +721,8 @@ require_once 'student_nav.php';
         .workplace-modal-content {
             max-width: 600px;
             width: 95%;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
         }
 
         .workplace-map-container {
@@ -719,9 +746,121 @@ require_once 'student_nav.php';
             font-size: 0.8rem;
         }
 
+        /* Location Search Styles */
+        .location-search-container {
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .search-input-wrapper {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background-color: var(--base-clr);
+            border: 1px solid var(--line-clr);
+            border-radius: 5px;
+            color: var(--text-clr);
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-clr);
+            box-shadow: 0 0 0 2px rgba(26, 210, 28, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: var(--secondary-text-clr);
+        }
+
+        .search-btn {
+            padding: 0.75rem 1.2rem;
+            background-color: var(--accent-clr);
+            color: var(--base-clr);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(26, 210, 28, 0.3);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--hover-clr);
+            border: 1px solid var(--line-clr);
+            border-radius: 5px;
+            margin-top: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
+        }
+
+        .search-results.show {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--line-clr);
+            transition: background-color 0.2s ease;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background-color: var(--base-clr);
+        }
+
+        .search-result-name {
+            font-weight: 500;
+            color: var(--text-clr);
+            margin-bottom: 0.25rem;
+        }
+
+        .search-result-address {
+            font-size: 0.85rem;
+            color: var(--secondary-text-clr);
+        }
+
+        .search-loading,
+        .search-no-results {
+            padding: 1rem;
+            text-align: center;
+            color: var(--secondary-text-clr);
+            font-size: 0.9rem;
+        }
+
         .workplace-map {
             width: 100%;
-            height: 200px;
+            height: 250px;
             border: 2px solid var(--line-clr);
             border-radius: 8px;
             background: #f0f0f0;
@@ -798,21 +937,34 @@ require_once 'student_nav.php';
         }
 
         @media (max-width: 768px) {
+            .modal {
+                padding: 1rem 0;
+            }
+
+            .modal-content {
+                margin: 0 1rem;
+                padding: 1.5rem;
+                width: calc(100% - 2rem);
+                max-height: calc(100vh - 2rem);
+            }
+
             .workplace-modal-content {
-                height: 40rem;
-                width: 19rem;
-                margin: 1rem auto;
+                max-height: calc(100vh - 2rem);
+                width: calc(100% - 2rem);
+                margin: 0 1rem;
                 padding: 1rem;
-                overflow-y: auto;
             }
 
             .modal-header {
                 margin-bottom: 1rem;
                 padding-bottom: 0.5rem;
+                flex-wrap: wrap;
+                gap: 0.5rem;
             }
 
             .modal-title {
                 font-size: 1.1rem;
+                flex: 1 1 100%;
             }
 
             .map-header h3 {
@@ -820,6 +972,41 @@ require_once 'student_nav.php';
             }
 
             .map-header p {
+                font-size: 0.75rem;
+            }
+
+            /* Location Search Mobile Styles */
+            .search-input-wrapper {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .search-input {
+                width: 100%;
+                font-size: 0.85rem;
+                padding: 0.6rem 0.8rem;
+            }
+
+            .search-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .search-results {
+                max-height: 150px;
+            }
+
+            .search-result-item {
+                padding: 0.6rem 0.8rem;
+            }
+
+            .search-result-name {
+                font-size: 0.85rem;
+            }
+
+            .search-result-address {
                 font-size: 0.75rem;
             }
 
@@ -876,11 +1063,14 @@ require_once 'student_nav.php';
                 margin-top: 1rem;
                 padding-top: 0.75rem;
                 gap: 0.5rem;
+                flex-direction: column;
             }
 
             .btn {
                 padding: 0.6rem 1rem;
                 font-size: 0.85rem;
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
@@ -974,6 +1164,11 @@ require_once 'student_nav.php';
                         <div class="instructor-name"><?php echo htmlspecialchars($student_profile['instructor']); ?>
                         </div>
                         <div class="instructor-role">OJT Instructor</div>
+                        <div class="instructor-email"
+                            style="color: var(--secondary-text-clr); font-size: 0.85rem; margin-top: 0.25rem;">
+                            <i class="fas fa-envelope" style="margin-right: 0.25rem;"></i>
+                            <?php echo htmlspecialchars($student_profile['instructor_email']); ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1122,6 +1317,19 @@ require_once 'student_nav.php';
                         <h3><i class="fas fa-map-marker-alt"></i> Click to select
                             <?php echo $hasWorkplace ? 'new' : 'your'; ?> Workplace Location
                         </h3>
+                    </div>
+
+                    <!-- Location Search -->
+                    <div class="location-search-container">
+                        <div class="search-input-wrapper">
+                            <input type="text" id="locationSearch" class="search-input"
+                                placeholder="Search for your workplace location (e.g., company name, address, city)..."
+                                autocomplete="off">
+                            <button type="button" class="search-btn" onclick="searchLocation()">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <div id="searchResults" class="search-results"></div>
                     </div>
 
                     <div id="workplaceMap" class="workplace-map"></div>
@@ -1419,6 +1627,107 @@ require_once 'student_nav.php';
                 showNotification('Geolocation is not supported by this browser.', 'error');
             }
         }
+
+        // Location Search Functionality
+        function searchLocation() {
+            const searchInput = document.getElementById('locationSearch');
+            const searchQuery = searchInput.value.trim();
+            const searchResults = document.getElementById('searchResults');
+            const searchBtn = document.querySelector('.search-btn');
+
+            if (!searchQuery) {
+                showNotification('Please enter a location to search', 'error');
+                return;
+            }
+
+            // Show loading state
+            searchBtn.disabled = true;
+            searchResults.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            searchResults.classList.add('show');
+
+            // Use our server-side proxy to avoid CORS issues
+            const url = `geocode_proxy.php?q=${encodeURIComponent(searchQuery)}&limit=5&countrycodes=ph`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    searchBtn.disabled = false;
+
+                    // Check for error response
+                    if (data.error) {
+                        searchResults.innerHTML = '<div class="search-no-results"><i class="fas fa-exclamation-triangle"></i> ' + data.error + '</div>';
+                        return;
+                    }
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        searchResults.innerHTML = '<div class="search-no-results"><i class="fas fa-exclamation-circle"></i> No results found. Try a different search term.</div>';
+                        return;
+                    }
+
+                    // Display results
+                    let resultsHTML = '';
+                    data.forEach((result, index) => {
+                        // Escape quotes in display name for onclick attribute
+                        const escapedName = result.display_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        resultsHTML += `
+                            <div class="search-result-item" onclick="selectSearchResult(${result.lat}, ${result.lon}, '${escapedName}')">
+                                <div class="search-result-name">${result.display_name.split(',')[0]}</div>
+                                <div class="search-result-address">${result.display_name}</div>
+                            </div>
+                        `;
+                    });
+
+                    searchResults.innerHTML = resultsHTML;
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    searchBtn.disabled = false;
+                    searchResults.innerHTML = '<div class="search-no-results"><i class="fas fa-exclamation-triangle"></i> Search failed. Please try again.</div>';
+                    showNotification('Failed to search location. Please try again.', 'error');
+                });
+        }
+
+        function selectSearchResult(lat, lng, displayName) {
+            // Set the location on the map
+            setMapLocation(lat, lng);
+
+            // Hide search results
+            const searchResults = document.getElementById('searchResults');
+            searchResults.classList.remove('show');
+
+            // Update search input with selected location
+            const searchInput = document.getElementById('locationSearch');
+            searchInput.value = displayName;
+
+            // Show success notification
+            showNotification('Location selected successfully!', 'success');
+        }
+
+        // Allow search on Enter key
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('locationSearch');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchLocation();
+                    }
+                });
+
+                // Hide search results when clicking outside
+                document.addEventListener('click', function (e) {
+                    const searchContainer = document.querySelector('.location-search-container');
+                    if (searchContainer && !searchContainer.contains(e.target)) {
+                        document.getElementById('searchResults').classList.remove('show');
+                    }
+                });
+            }
+        });
 
         function showNotification(message, type) {
             // Create notification element

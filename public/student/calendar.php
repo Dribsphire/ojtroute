@@ -755,8 +755,8 @@ require_once 'student_nav.php';
                     <div class="legend-item"><span class="legend-box present"></span><span>Present</span></div>
                     <div class="legend-item"><span class="legend-box absent"></span><span>Absent</span></div>
                     <div class="legend-item"><span class="legend-box excused"></span><span>Excused</span></div>
-                    <div class="legend-item"><span style="color: #4da6ff; font-size: 1.1rem;">★</span><span>Also Excused
-                            (Present + Excuse)</span></div>
+                    <div class="legend-item"><span style="color: #4da6ff; font-size: 1.1rem;">★</span><span> Present +
+                            Excuse </span></div>
                 </div>
             </div>
         </div>

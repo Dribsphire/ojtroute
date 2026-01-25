@@ -73,7 +73,7 @@ class AuthService
                     profile_pic_path,
                     is_archived
                 FROM users 
-                WHERE school_id = :school_id 
+                WHERE LOWER(school_id) = LOWER(:school_id)
                 AND role = 'admin'
                 AND is_archived = 0
                 LIMIT 1
@@ -87,12 +87,12 @@ class AuthService
                 // Check if user exists but is not admin
                 $stmtCheck = $this->db->prepare("
                     SELECT id, role FROM users 
-                    WHERE school_id = :school_id 
+                    WHERE LOWER(school_id) = LOWER(:school_id)
                     LIMIT 1
                 ");
                 $stmtCheck->execute([':school_id' => $schoolId]);
                 $userExists = $stmtCheck->fetch();
-                
+
                 if ($userExists) {
                     return [
                         'success' => false,
@@ -110,6 +110,11 @@ class AuthService
 
             // Verify password
             if (!password_verify($password, $user['password_hash'])) {
+                // Enhanced error logging for debugging
+                error_log("Authentication failed for admin: {$schoolId}");
+                error_log("Password hash length: " . strlen($user['password_hash']));
+                error_log("Hash format valid: " . (preg_match('/^\$2[ayb]\$.{56}$/', $user['password_hash']) ? 'yes' : 'no'));
+
                 return [
                     'success' => false,
                     'user' => null,
@@ -164,7 +169,7 @@ class AuthService
                     s.target_ojt_hours
                 FROM users u
                 LEFT JOIN students s ON u.id = s.user_id
-                WHERE u.school_id = :school_id 
+                WHERE LOWER(u.school_id) = LOWER(:school_id)
                 AND u.role = 'student'
                 AND u.is_archived = 0
                 LIMIT 1
@@ -178,12 +183,12 @@ class AuthService
                 // Check if user exists but is not student
                 $stmtCheck = $this->db->prepare("
                     SELECT id, role FROM users 
-                    WHERE school_id = :school_id 
+                    WHERE LOWER(school_id) = LOWER(:school_id)
                     LIMIT 1
                 ");
                 $stmtCheck->execute([':school_id' => $schoolId]);
                 $userExists = $stmtCheck->fetch();
-                
+
                 if ($userExists) {
                     return [
                         'success' => false,
@@ -201,6 +206,11 @@ class AuthService
 
             // Verify password
             if (!password_verify($password, $user['password_hash'])) {
+                // Enhanced error logging for debugging
+                error_log("Authentication failed for student: {$schoolId}");
+                error_log("Password hash length: " . strlen($user['password_hash']));
+                error_log("Hash format valid: " . (preg_match('/^\$2[ayb]\$.{56}$/', $user['password_hash']) ? 'yes' : 'no'));
+
                 return [
                     'success' => false,
                     'user' => null,
@@ -255,7 +265,7 @@ class AuthService
                     i.department
                 FROM users u
                 LEFT JOIN instructors i ON u.id = i.user_id
-                WHERE u.school_id = :school_id 
+                WHERE LOWER(u.school_id) = LOWER(:school_id)
                 AND u.role = 'instructor'
                 AND u.is_archived = 0
                 LIMIT 1
@@ -269,12 +279,12 @@ class AuthService
                 // Check if user exists but is not instructor
                 $stmtCheck = $this->db->prepare("
                     SELECT id, role FROM users 
-                    WHERE school_id = :school_id 
+                    WHERE LOWER(school_id) = LOWER(:school_id)
                     LIMIT 1
                 ");
                 $stmtCheck->execute([':school_id' => $schoolId]);
                 $userExists = $stmtCheck->fetch();
-                
+
                 if ($userExists) {
                     return [
                         'success' => false,
@@ -292,6 +302,11 @@ class AuthService
 
             // Verify password
             if (!password_verify($password, $user['password_hash'])) {
+                // Enhanced error logging for debugging
+                error_log("Authentication failed for instructor: {$schoolId}");
+                error_log("Password hash length: " . strlen($user['password_hash']));
+                error_log("Hash format valid: " . (preg_match('/^\$2[ayb]\$.{56}$/', $user['password_hash']) ? 'yes' : 'no'));
+
                 return [
                     'success' => false,
                     'user' => null,
@@ -334,7 +349,7 @@ class AuthService
             ");
             $stmt->execute([':instructor_id' => $instructorId]);
             $result = $stmt->fetch();
-            
+
             return isset($result['count']) && $result['count'] > 0;
         } catch (\PDOException $e) {
             error_log('Check instructor assignment error: ' . $e->getMessage());

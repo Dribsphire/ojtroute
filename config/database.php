@@ -1,11 +1,10 @@
 <?php
-/**
- * Database Configuration
- * OJT Route System
- */
 
 return [
     'host' => 'localhost',
+    //'dbname' => 'u825404776_ojtlastt',
+    //'username' => 'u825404776_ojtlast',
+    //'password' => 'NVAmzO4cC?6',
     'dbname' => 'ojt_db',
     'username' => 'root',
     'password' => '',
@@ -16,5 +15,6 @@ return [
         PDO::ATTR_EMULATE_PREPARES => false,
     ]
 ];
+
 
 
