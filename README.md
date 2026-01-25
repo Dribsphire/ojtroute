@@ -162,32 +162,8 @@ chmod -R 755 storage/images/
 # Ensure web server can write to these directories
 chown -R www-data:www-data storage/
 ```
-
 For Windows (XAMPP), ensure the `storage` folder has write permissions.
 
-### Step 5: Create Default Admin Account
-
-Run the initialization script or manually insert an admin user:
-
-```sql
-INSERT INTO users (school_id, full_name, email, password, role, is_archived, created_at)
-VALUES ('ADMIN001', 'System Administrator', 'admin@example.com', 
-        '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 
-        'admin', 0, NOW());
--- Default password: password (change immediately after first login)
-```
-
-### Step 6: Access the System
-
-Open your web browser and navigate to:
-- Local: `http://localhost/ojtlast/`
-- Network: `http://your-server-ip/ojtlast/`
-
-Default login credentials:
-- **Email**: admin@example.com
-- **Password**: password
-
-**⚠️ Important**: Change the default password immediately after first login!
 
 ## 👥 User Roles
 
@@ -276,73 +252,11 @@ Default login credentials:
 - **Service Layer** - Business logic separation
 - **RESTful API** - AJAX endpoints for dynamic operations
 
-## 📁 Project Structure
-
-```
-ojtlast/
-├── app/
-│   └── services/           # Business logic services
-│       ├── AuthService.php
-│       ├── StudentService.php
-│       ├── InstructorService.php
-│       ├── AdminService.php
-│       └── UserService.php
-├── config/
-│   └── database.php        # Database configuration
-├── public/
-│   ├── admin/             # Admin interface
-│   ├── instructor/        # Instructor interface
-│   ├── student/           # Student interface
-│   │   ├── attendance.php
-│   │   ├── calendar.php
-│   │   ├── student_documents.php
-│   │   ├── student_profile.php
-│   │   ├── student_timeouts.php
-│   │   └── student_nav.php
-│   ├── css/               # Stylesheets
-│   ├── js/                # JavaScript files
-│   ├── images/            # Static images
-│   ├── login.php          # Login page
-│   └── logout.php         # Logout handler
-├── storage/
-│   ├── images/            # Profile pictures
-│   └── uploads/           # Document uploads
-│       ├── attendance_images/
-│       └── student_docs/
-├── vendor/                # Composer dependencies
-├── .gitignore
-├── composer.json
-├── index.html             # Landing page
-└── README.md              # This file
-```
-
 ## ⚙️ Configuration
 
 ### Database Configuration
 
-Edit `config/database.php` to match your database settings:
-
-```php
-return [
-    'host' => 'localhost',      // Database host
-    'dbname' => 'ojt_system',   // Database name
-    'username' => 'root',        // Database username
-    'password' => '',            // Database password
-    'charset' => 'utf8mb4',
-    'options' => [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]
-];
-```
-
-### Session Configuration
-
-Sessions are configured in each entry point. Default settings:
-- Session timeout: 30 minutes of inactivity
-- Secure cookies (when using HTTPS)
-- HttpOnly cookies for security
+Edit `config/database.php` to match your database settings
 
 ### File Upload Limits
 
@@ -421,39 +335,6 @@ if ($distance > 60) {  // Change this value
    - Monitor attendance patterns
    - Generate analytics
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**Issue**: Cannot login
-- **Solution**: Check database connection, verify credentials, clear browser cache
-
-**Issue**: Location not detected
-- **Solution**: Enable location services in browser, allow location permissions, use HTTPS
-
-**Issue**: File upload fails
-- **Solution**: Check file size limits in php.ini, verify storage folder permissions
-
-**Issue**: Map not loading
-- **Solution**: Check internet connection, verify Leaflet.js CDN is accessible
-
-**Issue**: Attendance outside radius
-- **Solution**: Verify workplace location is set correctly, check GPS accuracy
-
-### Error Logs
-
-Check PHP error logs:
-- **XAMPP**: `C:\xampp\apache\logs\error.log`
-- **Linux**: `/var/log/apache2/error.log` or `/var/log/nginx/error.log`
-
-Enable error reporting in development:
-
-```php
-// Add to top of PHP files for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-```
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these guidelines:
@@ -484,9 +365,8 @@ For support and questions:
 
 ## 🙏 Acknowledgments
 
-- OpenStreetMap for Nominatim geocoding service
-- Leaflet.js for interactive maps
-- Font Awesome for icons
+- APIs used 
+- Coffee
 - All contributors and testers
 
 ## 🔄 Version History
