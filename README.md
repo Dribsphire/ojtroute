@@ -354,7 +354,10 @@ Contributions are welcome! Please follow these guidelines:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+© 2026 Colorado Manuel. All rights reserved.
+
+No permission is granted to use, copy, modify, or distribute this software
+without explicit written consent from the author.
 
 ## 📞 Support
 
