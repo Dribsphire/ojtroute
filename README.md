@@ -360,8 +360,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For support and questions:
 - **Email**: coloradomanuel.002@gmail.com
-- **Documentation**: [Wiki/Docs URL]
-- **Issues**: [GitHub Issues URL]
+- **Documentation**: Under school university institution 
 
 ## 🙏 Acknowledgments
 
@@ -381,6 +380,6 @@ For support and questions:
 
 ---
 
-**Made with ❤️ for educational institutions**
+**Made with hatred and complaints for educational institutions of CARLOS HILADO MEMORIAL STATE UNIVERSITY - Alijis Campus**
 
 *Last Updated: January 2026*
