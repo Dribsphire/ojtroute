@@ -55,6 +55,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
+// Handle Delete Document Type
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_document') {
+    $id = $_POST['document_id'] ?? null;
+
+    if ($id) {
+        $result = $instructorService->deleteDocumentType($id, $instructorId);
+        if ($result['success']) {
+            $_SESSION['success_msg'] = $result['message'];
+        } else {
+            $_SESSION['error_msg'] = $result['message'];
+        }
+    } else {
+        $_SESSION['error_msg'] = 'Invalid document ID.';
+    }
+    header('Location: documents.php');
+    exit;
+}
+
 // Handle Approval/Status Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_status') {
@@ -714,6 +732,10 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             </div>
                         </div>
                         <div style="display:flex; gap:0.5rem;">
+                            <button class="btn" onclick="deleteDocument(<?php echo $doc['id']; ?>, '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?>')"
+                                    title=" Delete Document">
+                                <i class="fas fa-trash"></i>
+                            </button>
                             <?php if ($doc['template_path']): ?>
                                 <button class="btn"
                                     onclick="window.openDocModal('<?php echo htmlspecialchars($doc['template_path']); ?>', '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?> Template')"
@@ -752,6 +774,11 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             </div>
                         </div>
                         <div style="display:flex; gap:0.5rem;">
+                            <button class="btn"
+                                onclick="deleteDocument(<?php echo $doc['id']; ?>, '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?>')"
+                                title="Delete Document">
+                                <i class="fas fa-trash"></i>
+                            </button>
                             <?php if ($doc['template_path']): ?>
                                 <button class="btn"
                                     onclick="window.openDocModal('<?php echo htmlspecialchars($doc['template_path']); ?>', '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?> Template')"
@@ -857,11 +884,11 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                                         </button>
                                         <button class="icon-btn" type="button" title="Process Approval"
                                             onclick="openApprovalModal(<?php echo $row['id']; ?>, '<?php echo $row['status']; ?>', '<?php echo htmlspecialchars($row['feedback'] ?? '', ENT_QUOTES); ?>', '<?php echo $row['points'] ?? ''; ?>', '<?php echo $row['accuracyQualityPoints'] ?? ''; ?>', '<?php echo $row['professionalPresentationPoints'] ?? ''; ?>')">
-                                                <i class="fas fa-check-square"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                            <i class="fas fa-check-square"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -1066,8 +1093,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             <i class="fas fa-info-circle" title="Award points for accuracy and quality of content"
                                 style="font-size: 0.8rem; opacity: 0.7; margin-left: 4px;"></i>
                         </label>
-                        <input type="number" id="approvalAccuracyQualityPoints" name="accuracyQualityPoints" min="0" max="100" step="0.5"
-                            placeholder="e.g., 10.0"
+                        <input type="number" id="approvalAccuracyQualityPoints" name="accuracyQualityPoints" min="0"
+                            max="100" step="0.5" placeholder="e.g., 10.0"
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                         <small
                             style="display:block; margin-top:0.3rem; color: rgba(255,255,255,0.6); font-size:0.85rem;">
@@ -1078,11 +1105,12 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     <div style="margin-bottom: 1rem;">
                         <label style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
                             Professional Presentation Points (Optional)
-                            <i class="fas fa-info-circle" title="Award points for professional formatting and presentation"
+                            <i class="fas fa-info-circle"
+                                title="Award points for professional formatting and presentation"
                                 style="font-size: 0.8rem; opacity: 0.7; margin-left: 4px;"></i>
                         </label>
-                        <input type="number" id="approvalProfessionalPresentationPoints" name="professionalPresentationPoints" min="0" max="100" step="0.5"
-                            placeholder="e.g., 8.0"
+                        <input type="number" id="approvalProfessionalPresentationPoints"
+                            name="professionalPresentationPoints" min="0" max="100" step="0.5" placeholder="e.g., 8.0"
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                         <small
                             style="display:block; margin-top:0.3rem; color: rgba(255,255,255,0.6); font-size:0.85rem;">
@@ -1105,7 +1133,20 @@ $otherDocs = array_filter($documentTypes, function ($d) {
         <input type="hidden" id="bulkApprovedIds" name="submission_ids" value="">
     </form>
 
+    <!-- Delete Document Form -->
+    <form id="deleteDocumentForm" method="POST" action="documents.php" style="display:none;">
+        <input type="hidden" name="action" value="delete_document">
+        <input type="hidden" id="deleteDocumentId" name="document_id" value="">
+    </form>
+
     <script>
+        function deleteDocument(id, name) {
+            if (confirm(`Are you sure you want to delete the document requirement "${name}"? This cannot be undone.`)) {
+                document.getElementById('deleteDocumentId').value = id;
+                document.getElementById('deleteDocumentForm').submit();
+            }
+        }
+
         // Auto-dismiss alerts after 5 seconds
         document.addEventListener('DOMContentLoaded', function () {
             const alerts = document.querySelectorAll('.alert');

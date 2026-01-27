@@ -6,8 +6,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Require authentication for AJAX requests
     require_once __DIR__ . '/../../app/middleware/requireStudent.php';
     require_once __DIR__ . '/../../app/services/StudentService.php';
+    require_once __DIR__ . '/../../app/services/UserService.php';
 
     $studentService = new \App\Services\StudentService();
+    $userService = new \App\Services\UserService();
     $response = ['success' => false, 'error' => 'Invalid request'];
 
     try {
@@ -145,6 +147,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $response['message'] = 'Workplace details updated successfully';
                 } else {
                     $response['error'] = 'Failed to update workplace details';
+                }
+                break;
+
+            case 'change_password':
+                $currentPassword = $_POST['current_password'] ?? '';
+                $newPassword = $_POST['new_password'] ?? '';
+                $confirmPassword = $_POST['confirm_password'] ?? '';
+
+                // Validate inputs
+                if (empty($currentPassword) || empty($newPassword) || empty($confirmPassword)) {
+                    $response['error'] = 'All password fields are required';
+                    break;
+                }
+
+                if ($newPassword !== $confirmPassword) {
+                    $response['error'] = 'New passwords do not match';
+                    break;
+                }
+
+                if (strlen($newPassword) < 6) {
+                    $response['error'] = 'New password must be at least 6 characters long';
+                    break;
+                }
+
+                // Verify current password
+                $db = $studentService->getDb();
+                $stmt = $db->prepare("SELECT password_hash FROM users WHERE id = :user_id");
+                $stmt->execute([':user_id' => $student_id]);
+                $user = $stmt->fetch();
+
+                if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+                    $response['error'] = 'Current password is incorrect';
+                    break;
+                }
+
+                // Update password using UserService
+                $result = $userService->updatePassword($student_id, $newPassword);
+
+                if ($result['success']) {
+                    $response['success'] = true;
+                    $response['message'] = 'Password changed successfully';
+                } else {
+                    $response['error'] = $result['message'] ?? 'Failed to change password';
                 }
                 break;
         }
@@ -1280,6 +1325,34 @@ require_once 'student_nav.php';
                     </div>
                 </div>
 
+                <!-- Password Change Section -->
+                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line-clr);">
+                    <h3 style="color: var(--accent-clr); margin-bottom: 1rem; font-size: 1.1rem;">
+                        <i class="fas fa-lock"></i> Change Password
+                    </h3>
+                    <p style="color: var(--secondary-text-clr); font-size: 0.9rem; margin-bottom: 1rem;">
+                        Leave blank if you don't want to change your password
+                    </p>
+
+                    <div class="form-group">
+                        <label class="form-label" for="current_password">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" class="form-input"
+                            placeholder="Enter your current password">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="new_password">New Password</label>
+                        <input type="password" id="new_password" name="new_password" class="form-input"
+                            placeholder="Enter new password (min. 6 characters)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="confirm_password">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" class="form-input"
+                            placeholder="Re-enter new password">
+                    </div>
+                </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-cancel" onclick="closeEditProfileModal()">
                         <i class="fas fa-times"></i> Cancel
@@ -1859,6 +1932,60 @@ require_once 'student_nav.php';
 
             // Get form data
             const formData = new FormData(event.target);
+
+            // Check if password fields are filled
+            const currentPassword = formData.get('current_password');
+            const newPassword = formData.get('new_password');
+            const confirmPassword = formData.get('confirm_password');
+
+            // If any password field is filled, validate all password fields
+            if (currentPassword || newPassword || confirmPassword) {
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                    showNotification('Please fill all password fields or leave them all empty', 'error');
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    showNotification('New passwords do not match', 'error');
+                    return;
+                }
+
+                if (newPassword.length < 6) {
+                    showNotification('New password must be at least 6 characters long', 'error');
+                    return;
+                }
+
+                // First update the password
+                const passwordData = new FormData();
+                passwordData.append('action', 'change_password');
+                passwordData.append('current_password', currentPassword);
+                passwordData.append('new_password', newPassword);
+                passwordData.append('confirm_password', confirmPassword);
+
+                fetch('student_profile.php', {
+                    method: 'POST',
+                    body: passwordData
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            // Password changed successfully, now update profile
+                            updateProfileData(formData);
+                        } else {
+                            showNotification(result.error || 'Failed to change password', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('An error occurred while changing password', 'error');
+                    });
+            } else {
+                // No password change, just update profile
+                updateProfileData(formData);
+            }
+        }
+
+        function updateProfileData(formData) {
             formData.append('action', 'update_profile');
 
             // Send data to server via AJAX

@@ -441,16 +441,6 @@ $totalMissingPreReq = array_sum(array_column($sectionStats, 'missing_prereq'));
 
             <div class="stat-card danger">
                 <div class="stat-icon danger">
-                    <i class="fas fa-calendar-times"></i>
-                </div>
-                <div class="stat-value">
-                    <?php echo $totalNoAttendance; ?>
-                </div>
-                <div class="stat-label">No Attendance (3 Days)</div>
-            </div>
-
-            <div class="stat-card danger">
-                <div class="stat-icon danger">
                     <i class="fas fa-file-excel"></i>
                 </div>
                 <div class="stat-value">

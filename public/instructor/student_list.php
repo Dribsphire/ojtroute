@@ -2010,8 +2010,8 @@ function buildPaginationUrl($page_num, $search_term)
             select.innerHTML = '<option value="">Loading students...</option>';
 
             // Use the students data already available on the page
-            <?php if (!empty($students)): ?>
-            const students = <?php echo json_encode($students); ?>;
+            <?php if (!empty($all_students)): ?>
+            const students = <?php echo json_encode(array_values($all_students)); ?>;
             select.innerHTML = '<option value="">Select a student...</option>';
             students.forEach(student => {
                 const option = document.createElement('option');
@@ -2177,11 +2177,11 @@ function buildPaginationUrl($page_num, $search_term)
 
         // Check every 15 seconds for new requests
         setInterval(checkWorkplaceRequests, 15000);
-    // CSV Export Functionality
-        document.getElementById('exportCSV').addEventListener('click', function() {
+        // CSV Export Functionality
+        document.getElementById('exportCSV').addEventListener('click', function () {
             // Get all students data (not just current page)
             const allStudents = <?php echo json_encode($all_students); ?>;
-            
+
             if (allStudents.length === 0) {
                 alert('No students to export');
                 return;
@@ -2218,23 +2218,23 @@ function buildPaginationUrl($page_num, $search_term)
             // Create blob and download
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            
+
             if (link.download !== undefined) {
                 // Create download link
                 const url = URL.createObjectURL(blob);
                 link.setAttribute('href', url);
-                
+
                 // Generate filename with current date
                 const date = new Date();
                 const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
                 link.setAttribute('download', `student_list_${dateStr}.csv`);
-                
+
                 // Trigger download
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                
+
                 // Show success message
                 console.log('CSV exported successfully');
             } else {
@@ -2247,15 +2247,15 @@ function buildPaginationUrl($page_num, $search_term)
             if (value === null || value === undefined) {
                 return '';
             }
-            
+
             // Convert to string
             value = String(value);
-            
+
             // If value contains comma, quote, or newline, wrap in quotes and escape quotes
             if (value.includes(',') || value.includes('"') || value.includes('\n')) {
                 value = '"' + value.replace(/"/g, '""') + '"';
             }
-            
+
             return value;
         }
     </script>

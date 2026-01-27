@@ -802,4 +802,44 @@ class InstructorService
             return 0;
         }
     }
+
+    /**
+     * Delete a document type
+     * 
+     * @param int $id Document Type ID
+     * @param int $instructorId Instructor ID (for authorization)
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function deleteDocumentType($id, $instructorId)
+    {
+        try {
+            // First check if the document type exists and belongs to the instructor
+            $stmt = $this->db->prepare("SELECT id, name FROM document_types WHERE id = :id AND instructor_id = :instructor_id");
+            $stmt->execute([':id' => $id, ':instructor_id' => $instructorId]);
+            $docType = $stmt->fetch();
+
+            if (!$docType) {
+                return ['success' => false, 'message' => 'Document type not found or you do not have permission to delete it.'];
+            }
+
+            // Check if there are any submissions for this document type
+            $checkStmt = $this->db->prepare("SELECT COUNT(*) FROM document_submissions WHERE document_type_id = :id");
+            $checkStmt->execute([':id' => $id]);
+            $submissionCount = $checkStmt->fetchColumn();
+
+            if ($submissionCount > 0) {
+                return ['success' => false, 'message' => 'Cannot delete document type because student submissions exist for it.'];
+            }
+
+            // Proceed with deletion
+            $deleteStmt = $this->db->prepare("DELETE FROM document_types WHERE id = :id");
+            $result = $deleteStmt->execute([':id' => $id]);
+
+            return $result ? ['success' => true, 'message' => 'Document type deleted successfully.'] : ['success' => false, 'message' => 'Failed to delete document type.'];
+
+        } catch (\PDOException $e) {
+            error_log('Delete document type error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Database error occurred.'];
+        }
+    }
 }

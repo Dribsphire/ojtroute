@@ -111,12 +111,9 @@ class EmailService
     private function sendLocalMail($to, $subject, $body, $cc = null, $bcc = null, $attachments = null)
     {
         try {
-            // For development/demo purposes, log emails instead of sending
-            // This avoids mail server configuration issues
-            return $this->logEmailForDemo($to, $subject, $body, $cc, $bcc, $attachments);
-            
-            // Uncomment below lines when mail server is properly configured
-            /*
+            // For development/demo purposes, log emails as well
+            $this->logEmailForDemo($to, $subject, $body, $cc, $bcc, $attachments);
+
             // Prepare headers
             $headers = [
                 'From: ' . $this->config['from_name'] . ' <' . $this->config['from_email'] . '>',
@@ -157,7 +154,6 @@ class EmailService
             }
 
             return $success;
-            */
         } catch (Exception $e) {
             error_log("Local mail sending failed: " . $e->getMessage());
             return false;
@@ -177,9 +173,9 @@ class EmailService
 
             $logFile = $logDir . '/emails.log';
             $timestamp = date('Y-m-d H:i:s');
-            
+
             $toAddresses = is_array($to) ? implode(', ', $to) : $to;
-            
+
             $logEntry = "=== Email Sent at {$timestamp} ===\n";
             $logEntry .= "To: {$toAddresses}\n";
             $logEntry .= "Subject: {$subject}\n";
@@ -204,7 +200,7 @@ class EmailService
 
             $filename = preg_replace('/[^a-zA-Z0-9]/', '_', $subject) . '_' . time() . '.html';
             $individualFile = $individualLogDir . '/' . $filename;
-            
+
             $emailContent = "<!DOCTYPE html><html><head><title>{$subject}</title></head><body>";
             $emailContent .= "<h2>Email Details</h2>";
             $emailContent .= "<p><strong>To:</strong> {$toAddresses}</p>";
@@ -355,7 +351,7 @@ class EmailService
         if ($this->config['use_smtp'] ?? false && isset($this->mail)) {
             return $this->mail->ErrorInfo;
         }
-        
+
         return 'Email logged successfully (demo mode) - check logs/emails/ directory';
     }
 
@@ -370,7 +366,7 @@ class EmailService
         try {
             $configPath = __DIR__ . '/../../config/database.php';
             $config = require $configPath;
-            
+
             $dsn = sprintf(
                 "mysql:host=%s;dbname=%s;charset=%s",
                 $config['host'],
@@ -379,7 +375,7 @@ class EmailService
             );
 
             $pdo = new \PDO($dsn, $config['username'], $config['password'], $config['options']);
-            
+
             $stmt = $pdo->prepare("
                 SELECT u.id, u.full_name, u.email, u.school_id
                 FROM users u
@@ -390,7 +386,7 @@ class EmailService
                 AND s.is_active = 1
                 ORDER BY u.full_name
             ");
-            
+
             $stmt->execute([':instructor_id' => $instructorId]);
             return $stmt->fetchAll();
         } catch (\PDOException $e) {
@@ -410,7 +406,7 @@ class EmailService
         try {
             $configPath = __DIR__ . '/../../config/database.php';
             $config = require $configPath;
-            
+
             $dsn = sprintf(
                 "mysql:host=%s;dbname=%s;charset=%s",
                 $config['host'],
@@ -419,7 +415,7 @@ class EmailService
             );
 
             $pdo = new \PDO($dsn, $config['username'], $config['password'], $config['options']);
-            
+
             $stmt = $pdo->prepare("
                 SELECT u.id, u.full_name, u.email, u.school_id
                 FROM users u
@@ -428,10 +424,10 @@ class EmailService
                 AND u.is_archived = 0
                 LIMIT 1
             ");
-            
+
             $stmt->execute([':student_id' => $studentId]);
             $student = $stmt->fetch();
-            
+
             return $student ?: null;
         } catch (\PDOException $e) {
             error_log('Database error getting student: ' . $e->getMessage());
@@ -455,7 +451,7 @@ class EmailService
         try {
             $configPath = __DIR__ . '/../../config/database.php';
             $config = require $configPath;
-            
+
             $dsn = sprintf(
                 "mysql:host=%s;dbname=%s;charset=%s",
                 $config['host'],
@@ -464,12 +460,12 @@ class EmailService
             );
 
             $pdo = new \PDO($dsn, $config['username'], $config['password'], $config['options']);
-            
+
             $stmt = $pdo->prepare("
                 INSERT INTO email_logs (admin_id, recipient_scope, subject, body, sent_at)
                 VALUES (:admin_id, :recipient_scope, :subject, :body, NOW())
             ");
-            
+
             return $stmt->execute([
                 ':admin_id' => $adminId,
                 ':recipient_scope' => $recipientScope,

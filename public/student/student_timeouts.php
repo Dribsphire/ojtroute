@@ -482,7 +482,8 @@ require_once 'student_nav.php';
             .timeouts-card {
                 padding: 0.75rem;
                 border-radius: 0.5em;
-                width: 18rem
+                width: 18rem;
+                height: 38rem;
             }
 
             .header-row h1 {
