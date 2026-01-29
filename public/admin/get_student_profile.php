@@ -68,88 +68,78 @@ try {
  * Get document submission statuses for a student
  * (Reused from export_reports_csv.php)
  */
+/**
+ * Get document submission statuses for a student
+ * Fetches dynamic pre-required documents from document_types table
+ */
 function getDocumentStatuses($pdo, $studentId)
 {
-    $statuses = [
-        'MOA' => '',
-        'Internship Agreement' => '',
-        'parents consent' => '',
-        'Endorsement' => '',
-        'pledge of good conduct' => '',
-        'resume' => '',
-        'application letter' => '',
-        'medical certificate' => '',
-        'weekly report' => ''
-    ];
+    // 1. Fetch the student's instructor ID first to filter relevant documents
+    $instSql = "
+        SELECT s.instructor_id 
+        FROM students st
+        JOIN users u ON st.user_id = u.id
+        JOIN sections s ON u.section_id = s.id
+        WHERE st.id = :student_id
+    ";
+    $instStmt = $pdo->prepare($instSql);
+    $instStmt->execute([':student_id' => $studentId]);
+    $instructorId = $instStmt->fetchColumn();
 
-    // Map document names to check
-    $documentMap = [
-        'MOA' => ['Memorandum of Agreement (MOA)', 'MOA'],
-        'Internship Agreement' => ['Internship Agreement'],
-        'parents consent' => ['Parent Consent Form', 'parents consent', 'parental consent'],
-        'Endorsement' => ['Endorsement Letter', 'Endorsement'],
-        'pledge of good conduct' => ['Pledge of Good Conduct', 'pledge of good conduct'],
-        'resume' => ['Resume/Curriculum Vitae', 'Resume', 'CV', 'resume'],
-        'application letter' => ['Application Letter', 'application letter'],
-        'medical certificate' => ['Medical Certificate', 'medical certificate', 'Medical Certificate (Excuse)'],
-        'weekly report' => ['Weekly OJT Report', 'weekly report', 'Weekly Report']
-    ];
+    // 2. Fetch all pre-required document types for this instructor (or global)
+    $docTypesSql = "
+        SELECT id, name
+        FROM document_types
+        WHERE is_active = 1 
+        AND is_pre_required = 1
+        AND (instructor_id = :inst_id OR instructor_id IS NULL)
+        ORDER BY name ASC
+    ";
+    $docTypesStmt = $pdo->prepare($docTypesSql);
+    $docTypesStmt->execute([':inst_id' => $instructorId]);
+    $preReqDocs = $docTypesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Get all document submissions for this student
-    $sql = "
+    // Initialize statuses array with dynamic document names
+    $statuses = [];
+    foreach ($preReqDocs as $doc) {
+        $statuses[$doc['name']] = false; // Default to incomplete
+    }
+
+    if (empty($preReqDocs)) {
+        return [];
+    }
+
+    // 3. Get actual submissions for these specific document types
+    $subSql = "
         SELECT 
             dt.name,
-            dt.code,
             ds.status,
             ds.submitted_at
         FROM document_submissions ds
         INNER JOIN document_types dt ON ds.document_type_id = dt.id
         WHERE ds.student_id = :student_id
-        ORDER BY ds.submitted_at DESC
+        AND dt.is_pre_required = 1
     ";
+    $subStmt = $pdo->prepare($subSql);
+    $subStmt->execute([':student_id' => $studentId]);
+    $submissions = $subStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([':student_id' => $studentId]);
-    $submissions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // 4. Map submissions to the requirements
+    foreach ($submissions as $sub) {
+        $docName = $sub['name'];
 
-    foreach ($submissions as $submission) {
-        $docName = strtolower($submission['name']);
-        $docCode = strtolower($submission['code'] ?? '');
-        $status = $submission['status'];
-        $submittedAt = $submission['submitted_at'];
+        // Only process if this is one of our required docs
+        if (array_key_exists($docName, $statuses)) {
+            $status = $sub['status'];
 
-        // Check each document type
-        foreach ($documentMap as $key => $possibleNames) {
-            // Skip if already found (except for weekly report which we want the latest)
-            if ($statuses[$key] !== '' && $key !== 'weekly report') {
-                continue;
+            // Logic: Mark as 'done' (true) if Approved or Pending
+            // Note: User can refine this if they want to distinguish pending vs approved in the UI
+            if ($status === 'approved') {
+                $statuses[$docName] = 'approved';
+            } elseif ($status === 'pending') {
+                $statuses[$docName] = 'pending';
             }
-
-            foreach ($possibleNames as $possibleName) {
-                $possibleNameLower = strtolower($possibleName);
-
-                // Check if document name or code contains the possible name
-                if (strpos($docName, $possibleNameLower) !== false || strpos($docCode, $possibleNameLower) !== false) {
-                    // For Endorsement, show the submitted date if approved
-                    if ($key === 'Endorsement' && $status === 'approved') {
-                        $date = new DateTime($submittedAt);
-                        $statuses[$key] = $date->format('F j, Y'); // Format: January 3, 2025
-                        break 2;
-                    }
-                    // For weekly report, show "done" if latest is submitted
-                    elseif ($key === 'weekly report') {
-                        if ($statuses[$key] === '') { // Only set once (latest)
-                            $statuses[$key] = ($status === 'approved' || $status === 'pending') ? 'done' : '';
-                        }
-                        break 2;
-                    }
-                    // For others, show "done" if approved
-                    elseif ($status === 'approved') {
-                        $statuses[$key] = 'done';
-                        break 2;
-                    }
-                }
-            }
+            // If rejected/revise, it remains false (incomplete)
         }
     }
 

@@ -133,6 +133,7 @@ if ($authService->isAuthenticated()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - OJT Route</title>
+    <link rel="icon" type="image/png" href="images/CHMSU.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
@@ -190,9 +191,29 @@ if ($authService->isAuthenticated()) {
                         </form>
 
                         <div class="text-center mt-3">
+                            <div class="d-flex justify-content-center align-items-center gap-3 mb-2">
+                                <a href="about_developer.php"
+                                    style="color: #6b7280; text-decoration: none; font-size:13px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960"
+                                        width="18px" fill="#6b7280">
+                                        <path
+                                            d="M710-150q-63 0-106.5-43.5T560-300q0-63 43.5-106.5T710-450q63 0 106.5 43.5T860-300q0 63-43.5 106.5T710-150Zm0-80q29 0 49.5-20.5T780-300q0-29-20.5-49.5T710-370q-29 0-49.5 20.5T640-300q0 29 20.5 49.5T710-230Zm-550-30v-80h320v80H160Zm90-250q-63 0-106.5-43.5T100-660q0-63 43.5-106.5T250-810q63 0 106.5 43.5T400-660q0 63-43.5 106.5T250-510Zm0-80q29 0 49.5-20.5T320-660q0-29-20.5-49.5T250-730q-29 0-49.5 20.5T180-660q0 29 20.5 49.5T250-590Zm230-30v-80h320v80H480Zm230 320ZM250-660Z" />
+                                    </svg>
+                                    About Developers</a>
+                                <a href="https://forms.gle/P9wWgxLmCYuqXhdFA" target="_blank"
+                                    style="color: #6b7280; text-decoration: none; font-size:13px; display: flex; align-items: center; gap: 4px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960"
+                                        width="18px" fill="currentColor">
+                                        <path
+                                            d="M480-200q66 0 113-47t47-113v-160q0-66-47-113t-113-47q-66 0-113 47t-47 113v160q0 66 47 113t113 47Zm-80-120h160v-80H400v80Zm0-160h160v-80H400v80Zm80 40Zm0 320q-65 0-120.5-32T272-240H160v-80h84q-3-20-3.5-40t-.5-40h-80v-80h80q0-20 .5-40t3.5-40h-84v-80h112q14-23 31.5-43t40.5-35l-64-66 56-56 86 86q28-9 57-9t57 9l88-86 56 56-66 66q23 15 41.5 34.5T688-640h112v80h-84q3 20 3.5 40t.5 40h80v80h-80q0 20-.5 40t-3.5 40h84v80H688q-32 56-87.5 88T480-120Z" />
+                                    </svg>
+                                    Report Bug
+                                </a>
+                            </div>
                             <small class="text-muted">
                                 CHMSU OJT routing system @2025
                             </small>
+
                         </div>
 
                     </div>

@@ -609,7 +609,18 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                             <?php foreach ($users as $user): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($user['school_id']); ?></td>
-                                    <td><?php echo htmlspecialchars($user['full_name']); ?></td>
+                                    <td>
+                                        <?php if ($user['role'] === 'student'): ?>
+                                            <a href="admin_student_information.php?id=<?php echo htmlspecialchars($user['id']); ?>"
+                                                style="color: var(--accent-clr); text-decoration: none; font-weight: 500;"
+                                                onmouseover="this.style.textDecoration='underline'"
+                                                onmouseout="this.style.textDecoration='none'">
+                                                <?php echo htmlspecialchars($user['full_name']); ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($user['full_name']); ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($user['email']); ?></td>
                                     <td>
                                         <span style="text-transform: capitalize;">

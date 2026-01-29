@@ -2177,87 +2177,13 @@ function buildPaginationUrl($page_num, $search_term)
 
         // Check every 15 seconds for new requests
         setInterval(checkWorkplaceRequests, 15000);
-        // CSV Export Functionality
+        // Excel Export Functionality
+        document.getElementById('exportCSV').innerHTML = '<i class="fas fa-file-excel"></i> Export Excel';
         document.getElementById('exportCSV').addEventListener('click', function () {
-            // Get all students data (not just current page)
-            const allStudents = <?php echo json_encode($all_students); ?>;
-
-            if (allStudents.length === 0) {
-                alert('No students to export');
-                return;
-            }
-
-            // Define CSV headers
-            const headers = [
-                'School ID',
-                'Full Name',
-                'Company Name',
-                'Position',
-                'Workplace Address',
-                'Supervisor',
-                'Total Hours'
-            ];
-
-            // Create CSV content
-            let csvContent = headers.join(',') + '\n';
-
-            // Add student data rows
-            allStudents.forEach(student => {
-                const row = [
-                    escapeCSV(student.school_id || ''),
-                    escapeCSV(student.full_name || ''),
-                    escapeCSV(student.company_name || 'No workplace assigned'),
-                    escapeCSV(student.position_title || '-'),
-                    escapeCSV(student.company_address || '-'),
-                    escapeCSV(student.company_head || '-'),
-                    student.total_hours || '0'
-                ];
-                csvContent += row.join(',') + '\n';
-            });
-
-            // Create blob and download
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-
-            if (link.download !== undefined) {
-                // Create download link
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-
-                // Generate filename with current date
-                const date = new Date();
-                const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-                link.setAttribute('download', `student_list_${dateStr}.csv`);
-
-                // Trigger download
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                // Show success message
-                console.log('CSV exported successfully');
-            } else {
-                alert('Your browser does not support CSV download');
-            }
+            window.location.href = 'export_reports_instructor.php';
         });
 
-        // Helper function to escape CSV values
-        function escapeCSV(value) {
-            if (value === null || value === undefined) {
-                return '';
-            }
 
-            // Convert to string
-            value = String(value);
-
-            // If value contains comma, quote, or newline, wrap in quotes and escape quotes
-            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                value = '"' + value.replace(/"/g, '""') + '"';
-            }
-
-            return value;
-        }
     </script>
 </body>
 

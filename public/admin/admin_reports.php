@@ -566,38 +566,44 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                         documentsContainer.innerHTML = '';
 
                         if (data.documents) {
-                            const documentLabels = {
-                                'MOA': 'Memorandum of Agreement (MOA)',
-                                'Internship Agreement': 'Internship Agreement',
-                                'parents consent': 'Parents Consent',
-                                'Endorsement': 'Endorsement Letter',
-                                'pledge of good conduct': 'Pledge of Good Conduct',
-                                'resume': 'Resume',
-                                'application letter': 'Application Letter',
-                                'medical certificate': 'Medical Certificate',
-                                'weekly report': 'Weekly Accomplishment Report'
-                            };
+                            // Render dynamic documents based on backend response
+                            const docKeys = Object.keys(data.documents).sort(); // Optional: Sort alphabetically
 
-                            for (const [key, status] of Object.entries(data.documents)) {
+                            docKeys.forEach(key => {
+                                const status = data.documents[key];
                                 const docItem = document.createElement('div');
-                                docItem.className = 'document-item ' + (status ? 'completed' : 'incomplete');
+                                
+                                // Determine class and icon based on status
+                                let statusClass = 'incomplete';
+                                let iconClass = 'fas fa-times-circle'; // Default X
+                                let statusText = '';
+
+                                if (status === 'approved') {
+                                    statusClass = 'completed';
+                                    iconClass = 'fas fa-check-circle';
+                                    statusText = ''; // No extra text for standard done
+                                } else if (status === 'pending') {
+                                    statusClass = 'warning'; // You might need to add CSS for .warning
+                                    iconClass = 'fas fa-clock';
+                                    statusText = ' (Pending)';
+                                }
+                                
+                                docItem.className = 'document-item ' + statusClass;
+                                // Simple inline style for warning if not defined in CSS
+                                if (status === 'pending') docItem.style.color = '#ffc107'; 
+                                if (!status) docItem.style.color = '#dc3545'; // Red for incomplete
 
                                 const icon = document.createElement('i');
-                                icon.className = status ? 'fas fa-check-circle' : 'fas fa-times-circle';
+                                icon.className = iconClass;
 
                                 const docName = document.createElement('span');
                                 docName.className = 'document-name';
-                                docName.textContent = documentLabels[key] || key;
-
-                                // For Endorsement, show the date if available
-                                if (key === 'Endorsement' && status && status !== 'done') {
-                                    docName.textContent += ` (${status})`;
-                                }
+                                docName.textContent = key + statusText;
 
                                 docItem.appendChild(icon);
                                 docItem.appendChild(docName);
                                 documentsContainer.appendChild(docItem);
-                            }
+                            });
                         } else {
                             documentsContainer.innerHTML = '<div style="color: var(--secondary-text-clr); font-style: italic;">No document information available</div>';
                         }

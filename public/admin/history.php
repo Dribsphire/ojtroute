@@ -453,7 +453,14 @@ $years = $userService->getArchivedYears();
                                                     <?php foreach ($students as $student): ?>
                                                                 <tr>
                                                                     <td><?php echo htmlspecialchars($student['school_id']); ?></td>
-                                                                    <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                                                    <td>
+                                                                        <a href="admin_student_information.php?id=<?php echo htmlspecialchars($student['id']); ?>" 
+                                                                           style="color: var(--accent-clr); text-decoration: none; font-weight: 500;"
+                                                                           onmouseover="this.style.textDecoration='underline'"
+                                                                           onmouseout="this.style.textDecoration='none'">
+                                                                            <?php echo htmlspecialchars($student['full_name']); ?>
+                                                                        </a>
+                                                                    </td>
                                                                     <td><?php echo htmlspecialchars($student['section_name'] ?? 'N/A'); ?></td>
                                                                     <td class="archive-date">
                                                                         <?php

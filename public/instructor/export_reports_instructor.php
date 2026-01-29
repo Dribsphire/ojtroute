@@ -5,10 +5,11 @@
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
-require_once __DIR__ . '/points_breakdown_helper.php';
+require_once __DIR__ . '/../../app/middleware/requireInstructor.php';
+require_once __DIR__ . '/../admin/points_breakdown_helper.php';
 
 use App\Services\ReportsService;
+use App\Services\InstructorService;
 
 // Set headers for Excel download
 header('Content-Type: application/vnd.ms-excel; charset=utf-8');
@@ -21,6 +22,15 @@ try {
     $dsn = "mysql:host={$config['host']};dbname={$config['dbname']};charset={$config['charset']}";
     $pdo = new PDO($dsn, $config['username'], $config['password'], $config['options']);
 
+    // Get Current Instructor ID
+    $instructorService = new InstructorService();
+    $instructorUserId = $_SESSION['user_id'];
+    $instructorId = $instructorService->getInstructorId($instructorUserId);
+
+    if (!$instructorId) {
+        die("Error: Instructor not found or invalid session.");
+    }
+
     // Get current academic year
     $currentYear = date('Y');
     $nextYear = $currentYear + 1;
@@ -29,9 +39,9 @@ try {
     // Filter by Section if provided
     $sectionId = isset($_GET['section_id']) ? (int) $_GET['section_id'] : null;
 
-    // 1. Fetch all students eligible for report
-    $whereConditions = ["u.role = 'student'", "u.is_archived = 0"];
-    $params = [];
+    // 1. Fetch all students eligible for report (Strictly filtered by Instructor)
+    $whereConditions = ["u.role = 'student'", "u.is_archived = 0", "s.instructor_id = :current_instructor_id"];
+    $params = [':current_instructor_id' => $instructorId];
 
     if ($sectionId) {
         $whereConditions[] = "u.section_id = :section_id";
