@@ -9,9 +9,12 @@ $userId = $_SESSION['user_id'] ?? 0;
 $student = $studentService->getStudentProfile($userId);
 
 // Fetch Real Data (using profile data if available, else defaults)
+$defaultLat = 10.64318297908722;
+$defaultLng = 122.93941207740018;
+
 $student_data = [
-    'workplace_latitude' => $student['latitude'] ?? 0,
-    'workplace_longitude' => $student['longitude'] ?? 0,
+    'workplace_latitude' => (!empty($student['latitude']) && $student['latitude'] != 0) ? $student['latitude'] : $defaultLat,
+    'workplace_longitude' => (!empty($student['longitude']) && $student['longitude'] != 0) ? $student['longitude'] : $defaultLng,
     'workplace_name' => $student['workplace'] ?? 'No Workplace Assigned'
 ];
 
@@ -63,8 +66,6 @@ foreach ($todayAttendance as $record) {
     ];
 }
 
-// Include navbar AFTER handling POST to avoid "headers already sent"
-require_once 'student_nav.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,7 +75,6 @@ require_once 'student_nav.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance - OJT TrainTrack</title>
     <link rel="icon" type="image/png" href="../images/CHMSU.png">
-    <link rel="icon" type="image/png" href="../../public/images/CHMSU.png">
     <link rel="stylesheet" href="../css/student_style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -86,6 +86,7 @@ require_once 'student_nav.php';
 </head>
 
 <body>
+    <?php require_once 'student_nav.php'; ?>
     <main>
         <div class="attendance-container">
             <h1>Attendance</h1><br>
@@ -693,7 +694,16 @@ require_once 'student_nav.php';
             const workplaceName = <?php echo json_encode($student_data['workplace_name']); ?>;
 
             // Initialize map
-            const map = L.map('attendanceMap').setView([defaultLat, defaultLng], 15);
+            // Initialize map with Philippines constraint
+            const map = L.map('attendanceMap', {
+                minZoom: 8,
+                maxBounds: [
+                    [4.0, 116.0], // South West
+                    [22.0, 128.0] // North East
+                ],
+                maxBoundsViscosity: 1.0,
+                zoomSnap: 0.01 // Allow fractional zoom
+            }).setView([defaultLat, defaultLng], 15);
 
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

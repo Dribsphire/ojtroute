@@ -362,7 +362,7 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                 </div>
                 <div class="modal-body">
                     <div class="student-detail">
-                        <img id="modalStudentAvatar" src="" alt="Student" class="student-avatar-lg">
+                        <img id="modalStudentAvatar" src="../../storage/images/default_profile.jpg" alt="Student" class="student-avatar-lg" onerror="this.src='../../storage/images/default_profile.jpg'">
                         <div class="student-info">
                             <h3 id="modalStudentName"></h3>
                             <div class="info-grid">
@@ -482,7 +482,7 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                 row.style.cursor = 'pointer';
 
                 const avatarUrl = student.profile_pic_path ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(student.full_name)}&background=random`;
+                    '../../storage/images/default_profile.jpg';
                 const sectionName = student.section_name || student.section_code || 'No Section';
                 const hours = parseFloat(student.total_hours || 0).toFixed(2);
 
@@ -490,7 +490,7 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                     <td>${escapeHtml(student.school_id)}</td>
                     <td class="student-cell">
                         <img src="${avatarUrl}" alt="${escapeHtml(student.full_name)}" class="student-avatar" 
-                             onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(student.full_name)}&background=random'">
+                             onerror="this.src='../../storage/images/default_profile.jpg'">
                         <span class="student-name">${escapeHtml(student.full_name)}</span>
                     </td>
                     <td>${escapeHtml(sectionName)}</td>
@@ -545,11 +545,11 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                     if (data.success && data.student) {
                         const student = data.student;
                         const avatarUrl = student.profile_pic_path ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(student.full_name)}&background=random`;
+                            '../../storage/images/default_profile.jpg';
 
                         document.getElementById('modalStudentAvatar').src = avatarUrl;
                         document.getElementById('modalStudentAvatar').onerror = function () {
-                            this.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(student.full_name)}&background=random`;
+                            this.src = '../../storage/images/default_profile.jpg';
                         };
                         document.getElementById('modalStudentName').textContent = student.full_name;
                         document.getElementById('modalStudentId').textContent = student.school_id;
@@ -572,7 +572,7 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                             docKeys.forEach(key => {
                                 const status = data.documents[key];
                                 const docItem = document.createElement('div');
-                                
+
                                 // Determine class and icon based on status
                                 let statusClass = 'incomplete';
                                 let iconClass = 'fas fa-times-circle'; // Default X
@@ -587,10 +587,10 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                                     iconClass = 'fas fa-clock';
                                     statusText = ' (Pending)';
                                 }
-                                
+
                                 docItem.className = 'document-item ' + statusClass;
                                 // Simple inline style for warning if not defined in CSS
-                                if (status === 'pending') docItem.style.color = '#ffc107'; 
+                                if (status === 'pending') docItem.style.color = '#ffc107';
                                 if (!status) docItem.style.color = '#dc3545'; // Red for incomplete
 
                                 const icon = document.createElement('i');

@@ -235,8 +235,8 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
 
         .profile-details {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
         }
 
         .detail-item {
@@ -251,6 +251,8 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
 
         .detail-value {
             color: var(--text-clr);
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
 
         .workplace-grid {
@@ -265,6 +267,7 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
             height: 200px;
             width: 100%;
             color: var(--secondary-text-clr);
+            grid-column: 1 / -1;
         }
 
         #map {
@@ -439,9 +442,34 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
                         </div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Start Date</div>
+                        <div class="detail-label">Supervisor Position</div>
                         <div class="detail-value">
-                            <?php echo $student['start_date'] ? date('F j, Y', strtotime($student['start_date'])) : 'N/A'; ?>
+                            <?php echo htmlspecialchars($student['supervisor_position'] ?: 'N/A'); ?>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="detail-item">
+                        <div class="detail-label">Immediate Head of Trainee</div>
+                        <div class="detail-value"><?php echo htmlspecialchars($student['head_trainee'] ?: 'N/A'); ?>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Head of Trainee Position</div>
+                        <div class="detail-value">
+                            <?php echo htmlspecialchars($student['head_trainee_position'] ?: 'N/A'); ?>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Head of Trainee Contact</div>
+                        <div class="detail-value">
+                            <?php echo htmlspecialchars($student['head_trainee_contact'] ?: 'N/A'); ?>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Head of Trainee Email</div>
+                        <div class="detail-value">
+                            <?php echo htmlspecialchars($student['head_trainee_email'] ?: 'N/A'); ?>
                         </div>
                     </div>
                 </div>

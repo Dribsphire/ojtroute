@@ -54,6 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         wcr.workplace_address as new_address,
                         wcr.position_title,
                         wcr.supervisor_name,
+                        wcr.supervisor_position,
+                        wcr.head_trainee,
+                        wcr.head_trainee_position,
+                        wcr.head_trainee_contact,
+                        wcr.head_trainee_email,
                         wcr.change_reason,
                         wcr.created_at,
                         COALESCE(sw.company_name, 'No active workplace') as current_workplace
@@ -129,15 +134,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         // Insert new workplace
                         $insertWpStmt = $instructorService->getDb()->prepare("
                             INSERT INTO student_workplaces (
-                                student_id, company_name, company_head, position_title, 
+                                student_id, company_name, company_head, position_title, company_address,
+                                supervisor_position, head_trainee, head_trainee_position, 
+                                head_trainee_contact, head_trainee_email,
                                 workplace_latitude, workplace_longitude, start_date, is_active
-                            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)
                         ");
                         $insertWpStmt->execute([
                             $studentDbId,
                             $request['workplace_name'],
                             $request['supervisor_name'],
                             $request['position_title'],
+                            $request['workplace_address'],
+                            $request['supervisor_position'],
+                            $request['head_trainee'],
+                            $request['head_trainee_position'],
+                            $request['head_trainee_contact'],
+                            $request['head_trainee_email'],
                             $request['latitude'] ?? 0,
                             $request['longitude'] ?? 0
                         ]);

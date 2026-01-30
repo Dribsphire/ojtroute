@@ -209,7 +209,6 @@ try {
     error_log('Excused dates fetch error for DTR: ' . $e->getMessage());
 }
 
-require_once 'student_nav.php';
 ?>
 
 <!DOCTYPE html>
@@ -661,6 +660,7 @@ require_once 'student_nav.php';
 </head>
 
 <body>
+    <?php require_once 'student_nav.php'; ?>
     <main>
         <div class="calendar-container">
             <h1>Attendance Calendar</h1><br>

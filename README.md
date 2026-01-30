@@ -369,6 +369,8 @@ For support and questions:
 
 - APIs used 
 - Coffee
+- Pia Juliana O. Fernandez
+- Kyla Marie E. Rolan
 - All contributors and testers
 
 ## 🔄 Version History
@@ -383,6 +385,6 @@ For support and questions:
 
 ---
 
-**Made with hatred and complaints for educational institutions of CARLOS HILADO MEMORIAL STATE UNIVERSITY - Alijis Campus**
+**Made for educational institutions of CARLOS HILADO MEMORIAL STATE UNIVERSITY - Alijis Campus**
 
 *Last Updated: January 2026*

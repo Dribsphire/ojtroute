@@ -97,6 +97,7 @@ class StudentService
                 u.facebook_name,
                 u.profile_pic_path,
                 u.year,
+                u.section_id,
                 s.section_code,
                 s.section_name,
                 s.department,
@@ -109,7 +110,12 @@ class StudentService
                 sw.company_address,
                 sw.position_title,
                 sw.workplace_latitude,
-                sw.workplace_longitude
+                sw.workplace_longitude,
+                sw.supervisor_position,
+                sw.head_trainee,
+                sw.head_trainee_position,
+                sw.head_trainee_contact,
+                sw.head_trainee_email
             FROM users u
             LEFT JOIN sections s ON u.section_id = s.id
             LEFT JOIN instructors ON s.instructor_id = instructors.id
@@ -152,14 +158,63 @@ class StudentService
                 'supervisor' => $student['company_head'] ?: 'Not assigned',
                 'position' => $student['position_title'] ?: 'Intern',
                 'workplace_address' => $student['company_address'] ?? 'Not available',
-                'workplace_contact' => 'Not available', // No column in DB yet
+                'workplace_contact' => 'Not available',
+                'supervisor_position' => $student['supervisor_position'] ?? '',
+                'head_trainee' => $student['head_trainee'] ?? '',
+                'head_trainee_position' => $student['head_trainee_position'] ?? '',
+                'head_trainee_contact' => $student['head_trainee_contact'] ?? '',
+                'head_trainee_email' => $student['head_trainee_email'] ?? '',
                 'latitude' => $student['workplace_latitude'],
                 'longitude' => $student['workplace_longitude'],
-                'ojt_hours' => $ojtHours
+                'ojt_hours' => $ojtHours,
+                'classmates' => $this->getClassmates($student['section_id'], $studentId)
             ];
         } catch (\PDOException $e) {
             error_log('Get student profile error: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Get classmates for a student
+     * 
+     * @param int $sectionId Section ID
+     * @param int $excludeUserId User ID to exclude (current student)
+     * @return array List of classmates
+     */
+    private function getClassmates($sectionId, $excludeUserId)
+    {
+        if (!$sectionId)
+            return [];
+
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    u.full_name,
+                    CASE 
+                        WHEN u.profile_pic_path IS NULL THEN NULL
+                        WHEN u.profile_pic_path LIKE '../%' THEN u.profile_pic_path
+                        WHEN u.profile_pic_path LIKE 'storage/%' THEN CONCAT('../../', u.profile_pic_path)
+                        ELSE u.profile_pic_path
+                    END as profile_pic_path
+                FROM users u
+                JOIN students s ON u.id = s.user_id
+                WHERE u.section_id = :section_id
+                AND u.role = 'student'
+                AND u.is_archived = 0
+                AND u.id != :exclude_id
+                ORDER BY u.full_name ASC
+            ");
+
+            $stmt->execute([
+                ':section_id' => $sectionId,
+                ':exclude_id' => $excludeUserId
+            ]);
+
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log('Get classmates error: ' . $e->getMessage());
+            return [];
         }
     }
 
@@ -290,7 +345,12 @@ class StudentService
                     workplace_name, 
                     workplace_address,
                     position_title,
-                    supervisor_name, 
+                    supervisor_name,
+                    supervisor_position,
+                    head_trainee,
+                    head_trainee_position,
+                    head_trainee_contact,
+                    head_trainee_email, 
                     latitude, 
                     longitude, 
                     change_reason, 
@@ -302,6 +362,11 @@ class StudentService
                     :workplace_address,
                     :position_title,
                     :supervisor_name,
+                    :supervisor_position,
+                    :head_trainee,
+                    :head_trainee_position,
+                    :head_trainee_contact,
+                    :head_trainee_email,
                     :latitude,
                     :longitude,
                     :change_reason,
@@ -316,6 +381,11 @@ class StudentService
                 ':workplace_address' => $workplaceData['workplace_address'],
                 ':position_title' => $workplaceData['position'] ?? '',
                 ':supervisor_name' => $workplaceData['supervisor_name'] ?? '',
+                ':supervisor_position' => $workplaceData['supervisor_position'] ?? '',
+                ':head_trainee' => $workplaceData['head_trainee'] ?? '',
+                ':head_trainee_position' => $workplaceData['head_trainee_position'] ?? '',
+                ':head_trainee_contact' => $workplaceData['head_trainee_contact'] ?? '',
+                ':head_trainee_email' => $workplaceData['head_trainee_email'] ?? '',
                 ':latitude' => $workplaceData['latitude'],
                 ':longitude' => $workplaceData['longitude'],
                 ':change_reason' => $workplaceData['change_reason']
@@ -349,7 +419,19 @@ class StudentService
             $stmt->execute([$studentDbId]);
             $existingId = $stmt->fetchColumn();
 
-            $allowed = ['company_name', 'company_head', 'position_title', 'workplace_latitude', 'workplace_longitude', 'company_address'];
+            $allowed = [
+                'company_name',
+                'company_head',
+                'position_title',
+                'workplace_latitude',
+                'workplace_longitude',
+                'company_address',
+                'supervisor_position',
+                'head_trainee',
+                'head_trainee_position',
+                'head_trainee_contact',
+                'head_trainee_email'
+            ];
 
             if ($existingId) {
                 // UPDATE existing record

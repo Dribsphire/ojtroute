@@ -22,7 +22,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Fetch Real Data
 $timeout_data = $studentService->getMissingTimeouts($dbId);
 
-require_once 'student_nav.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -585,6 +584,7 @@ require_once 'student_nav.php';
 </head>
 
 <body>
+    <?php require_once 'student_nav.php'; ?>
     <main>
         <div class="timeouts-container">
             <div class="timeouts-card">

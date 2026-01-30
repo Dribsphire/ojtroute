@@ -76,8 +76,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'workplace_address' => $_POST['workplace_address'] ?? '',
                     'position' => $_POST['position'] ?? '',
                     'supervisor_name' => $_POST['supervisor_name'] ?? '',
-                    'latitude' => $_POST['latitude'] ?? '',
-                    'longitude' => $_POST['longitude'] ?? ''
+                    'supervisor_position' => $_POST['supervisor_position'] ?? '',
+                    'head_trainee' => $_POST['head_trainee'] ?? '',
+                    'head_trainee_position' => $_POST['head_trainee_position'] ?? '',
+                    'head_trainee_contact' => $_POST['head_trainee_contact'] ?? '',
+                    'head_trainee_email' => $_POST['head_trainee_email'] ?? '',
+                    'latitude' => $_POST['latitude'] ?? 0,
+                    'longitude' => $_POST['longitude'] ?? 0
                 ];
 
                 // Validate required fields (except change_reason for initial setup)
@@ -91,10 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 if ($hasWorkplace) {
-                    // Student already has workplace - submit change request
+                    // Requesting a change
                     $changeReason = $_POST['change_reason'] ?? '';
                     if (empty($changeReason)) {
-                        $response['error'] = 'Please provide a reason for the workplace change';
+                        $response['error'] = 'Reason for change is required';
                         break;
                     }
 
@@ -114,6 +119,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         'company_address' => $workplaceData['workplace_address'],
                         'position_title' => $workplaceData['position'],
                         'company_head' => $workplaceData['supervisor_name'],
+                        'supervisor_position' => $workplaceData['supervisor_position'],
+                        'head_trainee' => $workplaceData['head_trainee'],
+                        'head_trainee_position' => $workplaceData['head_trainee_position'],
+                        'head_trainee_contact' => $workplaceData['head_trainee_contact'],
+                        'head_trainee_email' => $workplaceData['head_trainee_email'],
                         'workplace_latitude' => $workplaceData['latitude'],
                         'workplace_longitude' => $workplaceData['longitude']
                     ];
@@ -222,9 +232,6 @@ if (!$student_profile) {
 
 // Check if student has already set up workplace
 $hasWorkplace = $studentService->hasWorkplace($student_id);
-
-// Include navigation
-require_once 'student_nav.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -240,7 +247,6 @@ require_once 'student_nav.php';
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <link rel="stylesheet" href="../css/student_style.css">
-    <!-- CRITICAL FIX: Add hours validation utilities -->
     <script src="../js/hours-validation.js"></script>
     <script>
         // Safety check to prevent progress bar overflow on load
@@ -517,7 +523,13 @@ require_once 'student_nav.php';
             color: var(--secondary-text-clr);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 850px) {
+            .profile-container {
+                width: 100%;
+                margin: 1rem 0;
+                padding: 0 1rem;
+            }
+
             .profile-header {
                 flex-direction: column;
                 align-items: center;
@@ -526,6 +538,8 @@ require_once 'student_nav.php';
 
             .profile-info {
                 text-align: center;
+                min-width: 0;
+                width: 100%;
             }
 
             .contact-buttons {
@@ -534,6 +548,40 @@ require_once 'student_nav.php';
 
             .profile-details {
                 grid-template-columns: 1fr;
+            }
+
+            .detail-card {
+                padding: 1rem;
+            }
+
+            .detail-label {
+                width: 100px;
+                font-size: 0.9rem;
+            }
+
+            .detail-value {
+                font-size: 0.9rem;
+                overflow-wrap: break-word;
+            }
+
+            /* Fix header alignment */
+            .detail-card .header {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .detail-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+
+            .detail-label {
+                width: 100%;
+                color: var(--accent-clr);
             }
         }
 
@@ -1122,6 +1170,7 @@ require_once 'student_nav.php';
 </head>
 
 <body>
+    <?php require_once 'student_nav.php'; ?>
     <main>
         <div class="profile-header">
             <img src="<?php echo htmlspecialchars($student_profile['profile_pic']); ?>" alt="Profile Picture"
@@ -1219,62 +1268,205 @@ require_once 'student_nav.php';
             </div>
 
             <div class="detail-card">
-                <h3>OJT Chairperson</h3>
+                <h3>System Administrator</h3>
                 <?php if (!empty($student_profile['admins'])): ?>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
-                        <?php foreach ($student_profile['admins'] as $admin): ?>
-                            <div class="admin-card" style="text-align: center;">
-                                <img src="<?php echo htmlspecialchars($admin['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
-                                    alt="<?php echo htmlspecialchars($admin['full_name']); ?>" class="admin-pic"
-                                    style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem;">
-                                <div class="admin-name" style="font-weight: 600; font-size: 0.9rem;">
-                                    <?php echo htmlspecialchars($admin['full_name']); ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="admin-card">
-                        <img src="../../storage/images/default_profile.jpg" alt="Admin" class="admin-pic">
-                        <div class="admin-info">
-                            <div class="admin-name">System Administrator</div>
-                            <div class="admin-role">OJT Chairperson</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
+                            <?php foreach ($student_profile['admins'] as $admin): ?>
+                                    <div class="admin-card" style="text-align: center;">
+                                        <img src="<?php echo htmlspecialchars($admin['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
+                                            alt="<?php echo htmlspecialchars($admin['full_name']); ?>" class="admin-pic"
+                                            style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem;">
+                                        <div class="admin-name" style="font-weight: 600; font-size: 0.9rem;">
+                                            <?php echo htmlspecialchars($admin['full_name']); ?>
+                                        </div>
+                                    </div>
+                            <?php endforeach; ?>
                         </div>
-                    </div>
+                <?php else: ?>
+                        <div class="admin-card">
+                            <img src="../../storage/images/default_profile.jpg" alt="Admin" class="admin-pic">
+                            <div class="admin-info">
+                                <div class="admin-name">System Administrator</div>
+                                <div class="admin-role">OJT Chairperson</div>
+                            </div>
+                        </div>
                 <?php endif; ?>
             </div>
-        </div>
-        <br>
-        <!-- <div class="detail-card">
-                    <h3>Workplace Information</h3>
-                    <div class="contact-buttons">
-                        <a href="#" class="btn btn-outline" onclick="openEditWorkplaceModal()" style="font-size: 13px;">
-                            <i class="fas fa-edit"></i> Set workplace
-                        </a>
-                    </div><br>
-                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 300px;">
-                        <div class="detail-item">
-                            <span class="detail-label">Workplace:</span>
-                            <span class="detail-value"><?php echo htmlspecialchars($student_profile['workplace']); ?></span>
+        </div><br>
+        <div class="detail-card classmates-section" style="overflow: visible;">
+            <h3>Your Classmates</h3>
+            <style>
+                #sidebar {
+                    z-index: 1000;
+                }
+
+                @media (max-width: 850px) {
+                    .classmates-section {
+                        display: none;
+                    }
+                }
+
+                .classmate-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                    gap: 1.5rem;
+                    padding: 0.5rem;
+                }
+
+                .classmate-card {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    position: relative;
+                    cursor: pointer;
+                }
+
+                .classmate-pic {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    border: 2px solid transparent;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+                }
+
+                .classmate-card:hover .classmate-pic {
+                    border-color: var(--accent-clr);
+                    transform: scale(1.1);
+                }
+
+                .classmate-info {
+                    position: absolute;
+                    bottom: 110%;
+                    left: 50%;
+                    transform: translateX(-50%) translateY(10px);
+                    background: #2a2b3a;
+                    padding: 0.8rem;
+                    border-radius: 8px;
+                    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+                    text-align: center;
+                    width: max-content;
+                    max-width: 200px;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+                    z-index: 100;
+                    border: 1px solid var(--line-clr);
+                    pointer-events: none;
+                }
+
+                .classmate-card:hover .classmate-info {
+                    opacity: 1;
+                    visibility: visible;
+                    transform: translateX(-50%) translateY(0);
+                }
+
+                .classmate-info::before {
+                    content: '';
+                    position: absolute;
+                    bottom: -6px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    border-width: 6px 6px 0 6px;
+                    border-style: solid;
+                    border-color: #2a2b3a transparent transparent transparent;
+                }
+
+                .classmate-name {
+                    color: var(--text-clr);
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    margin-bottom: 0.2rem;
+                    display: block;
+                }
+
+                .classmate-hours {
+                    color: var(--accent-clr);
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                }
+
+                .show-more-btn {
+                    grid-column: 1 / -1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--hover-clr);
+                    border: 1px solid var(--line-clr);
+                    border-radius: 8px;
+                    color: var(--text-clr);
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-size: 0.9rem;
+                    margin-top: 0.5rem;
+                }
+
+                .show-more-btn:hover {
+                    background: var(--accent-clr);
+                    color: #111;
+                    border-color: var(--accent-clr);
+                }
+
+                .classmate-card.hidden-classmate {
+                    display: none;
+                }
+
+                .classmate-card.hidden-classmate.show-all {
+                    display: flex;
+                }
+            </style>
+            <div class="classmate-grid">
+                <?php if (!empty($student_profile['classmates'])): ?>
+                        <?php
+                        $totalClassmates = count($student_profile['classmates']);
+                        $showLimit = 20;
+                        ?>
+                        <?php foreach ($student_profile['classmates'] as $index => $classmate): ?>
+                                <div class="classmate-card <?php echo $index >= $showLimit ? 'hidden-classmate' : ''; ?>">
+                                    <img src="<?php echo htmlspecialchars($classmate['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
+                                        alt="<?php echo htmlspecialchars($classmate['full_name']); ?>" class="classmate-pic">
+                                    <div class="classmate-info">
+                                        <span class="classmate-name"><?php echo htmlspecialchars($classmate['full_name']); ?></span>
+                                    </div>
+                                </div>
+                        <?php endforeach; ?>
+                        <?php if ($totalClassmates > $showLimit): ?>
+                                <button class="show-more-btn" onclick="toggleClassmates(this)">
+                                    <i class="fas fa-chevron-down"></i>
+                                    Show More (<?php echo $totalClassmates - $showLimit; ?> more)
+                                </button>
+                        <?php endif; ?>
+                <?php else: ?>
+                        <div
+                            style="grid-column: 1 / -1; text-align: center; color: var(--secondary-text-clr); font-style: italic;">
+                            No classmates found.
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Supervisor:</span>
-                            <span class="detail-value"><?php echo htmlspecialchars($student_profile['supervisor']); ?></span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Position:</span>
-                            <span class="detail-value"><?php echo htmlspecialchars($student_profile['position']); ?></span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Workplace Address:</span>
-                            <span class="detail-value"><?php echo htmlspecialchars($student_profile['workplace_address']); ?></span>
-                        </div>
-                    </div>
-                    <div style="flex: 1; min-width: 300px;">
-                        <div id="displayWorkplaceMap" class="workplace-map" style="height: 100%; min-height: 250px;"></div>
-                    </div>
-                </div>-->
+                <?php endif; ?>
+            </div>
+        </div><br>
+
+        <script>
+            function toggleClassmates(btn) {
+                const hiddenCards = document.querySelectorAll('.classmate-card.hidden-classmate');
+                const isExpanded = btn.classList.contains('expanded');
+
+                hiddenCards.forEach(card => {
+                    card.classList.toggle('show-all');
+                });
+
+                if (isExpanded) {
+                    btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show More (<?php echo isset($totalClassmates) && isset($showLimit) ? $totalClassmates - $showLimit : 0; ?> more)';
+                    btn.classList.remove('expanded');
+                } else {
+                    btn.innerHTML = '<i class="fas fa-chevron-up"></i> Show Less';
+                    btn.classList.add('expanded');
+                }
+            }
+        </script>
+
     </main>
 
     <!-- Edit Profile Modal -->
@@ -1379,10 +1571,10 @@ require_once 'student_nav.php';
 
             <form id="workplaceForm" onsubmit="saveWorkplace(event)">
                 <?php if ($hasWorkplace): ?>
-                    <div class="change-notice">
-                        <i class="fas fa-info-circle"></i>
-                        <span>You have already set your workplace. Any changes require instructor approval.</span>
-                    </div>
+                        <div class="change-notice">
+                            <i class="fas fa-info-circle"></i>
+                            <span>You have already set your workplace. Any changes require instructor approval.</span>
+                        </div>
                 <?php endif; ?>
 
                 <div class="workplace-map-container">
@@ -1409,32 +1601,76 @@ require_once 'student_nav.php';
 
 
                 </div>
-                <div style="display: flex; gap: 1rem;">
-                    <div class="form-group">
-                        <input type="text" id="workplace_name" name="workplace_name" class="form-input"
-                            placeholder="Workplace name" required>
-                    </div>
+                <div class="form-group">
+                    <input type="text" id="workplace_name" name="workplace_name" class="form-input"
+                        placeholder="Host Traning Establishment (Workplace OJT Name)"
+                        value="<?php echo htmlspecialchars($student_profile['workplace'] !== 'Not assigned' ? $student_profile['workplace'] : ''); ?>"
+                        required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="position" name="position" class="form-input"
+                        placeholder="STUDENT POSITION ON THE HTE"
+                        value="<?php echo htmlspecialchars($student_profile['position'] !== 'Intern' ? $student_profile['position'] : ''); ?>"
+                        required>
+                </div>
 
-                    <div class="form-group">
-                        <input type="text" id="workplace_address" name="workplace_address" class="form-input"
-                            placeholder="Workplace address" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="text" id="position" name="position" class="form-input" placeholder="Position"
-                            required>
-                    </div>
+                <div class="form-group">
+                    <input type="text" id="workplace_address" name="workplace_address" class="form-input"
+                        placeholder="HTE WORKPLACE ADDRESS"
+                        value="<?php echo htmlspecialchars($student_profile['workplace_address'] !== 'Not available' ? $student_profile['workplace_address'] : ''); ?>"
+                        required>
                 </div>
                 <div class="form-group">
                     <input type="text" id="supervisor_name" name="supervisor_name" class="form-input"
-                        placeholder="Supervisor name" required>
+                        placeholder="HTE AGENCY HEAD (Supervisor)"
+                        value="<?php echo htmlspecialchars($student_profile['supervisor'] !== 'Not assigned' ? $student_profile['supervisor'] : ''); ?>"
+                        required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="supervisor_position" name="supervisor_position" class="form-input"
+                        placeholder="HTE AGENCY HEAD JOB POSITION/ DESIGNATION"
+                        value="<?php echo htmlspecialchars($student_profile['supervisor_position'] ?? ''); ?>" required>
+                </div>
+
+
+                <label>IMMEDIATE SUPERVISING HEAD INFORMATION <svg xmlns="http://www.w3.org/2000/svg" height="15px"
+                        viewBox="0 -960 960 960" width="15px" fill="#e3e3e3">
+                        <path
+                            d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
+                    </svg></label>
+                <div class="form-group">
+                    <input type="text" id="head_trainee" name="head_trainee" class="form-input"
+                        placeholder="NAME OF THE IMMEDIATE SUPERVISING HEAD OF THE TRAINEE IN HTE"
+                        value="<?php echo htmlspecialchars($student_profile['head_trainee'] ?? ''); ?>" required>
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <div class="form-group">
+                        <input type="text" id="head_trainee_position" name="head_trainee_position" class="form-input"
+                            placeholder="JOB POSITION"
+                            value="<?php echo htmlspecialchars($student_profile['head_trainee_position'] ?? ''); ?>"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="head_trainee_contact" name="head_trainee_contact" class="form-input"
+                            placeholder="CONTACT NUMBER"
+                            value="<?php echo htmlspecialchars($student_profile['head_trainee_contact'] ?? ''); ?>"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="head_trainee_email" name="head_trainee_email" class="form-input"
+                            placeholder="EMAIL ADDRESS"
+                            value="<?php echo htmlspecialchars($student_profile['head_trainee_email'] ?? ''); ?>"
+                            required>
+                    </div>
                 </div>
                 <?php if ($hasWorkplace): ?>
-                    <div class="form-group">
-                        <label class="form-label" for="change_reason">Reason for Change *</label>
-                        <textarea id="change_reason" name="change_reason" class="form-input" rows="4"
-                            placeholder="Please explain why you need to change your OJT workplace location..."
-                            required></textarea>
-                    </div>
+                        <div class="form-group">
+                            <label class="form-label" for="change_reason">Reason for Change *</label>
+                            <textarea id="change_reason" name="change_reason" class="form-input" rows="4"
+                                placeholder="Please explain why you need to change your OJT workplace location..."
+                                required></textarea>
+                        </div>
                 <?php endif; ?>
 
                 <div class="modal-footer">
@@ -1448,56 +1684,6 @@ require_once 'student_nav.php';
             </form>
         </div>
     </div>
-
-    <!-- Edit Actual Workplace Modal
-    <div id="editActualWorkplaceModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Edit Workplace Details</h2>
-                <button type="button" class="btn btn-outline" onclick="getCurrentLocation()">
-                    <i class="fas fa-crosshairs"></i> Use Current Location
-                </button>
-            </div>
-            
-            <form id="editActualWorkplaceForm" onsubmit="saveActualWorkplace(event)">
-                <div style="display: flex; gap: 1rem;">
-                    <div class="form-group"> 
-                        <label class="form-label">Company Name</label>
-                        <input type="text" name="company_name" class="form-input" 
-                            value="<?php echo htmlspecialchars($student_profile['workplace'] !== 'Not assigned' ? $student_profile['workplace'] : ''); ?>" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Supervisor (Head)</label>
-                        <input type="text" name="company_head" class="form-input" 
-                            value="<?php echo htmlspecialchars($student_profile['supervisor'] !== 'Not assigned' ? $student_profile['supervisor'] : ''); ?>">
-                    </div>
-                </div>
-                <div style="display: flex; gap: 1rem;">
-                        <div class="form-group">
-                            <label class="form-label">Position Title</label>
-                            <input type="text" name="position_title" class="form-input" 
-                                value="<?php echo htmlspecialchars($student_profile['position'] !== 'Intern' ? $student_profile['position'] : ''); ?>">
-                        </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Address</label>
-                        <input type="text" name="address" class="form-input" 
-                               value="<?php echo htmlspecialchars($student_profile['workplace_address'] !== 'Not available' ? $student_profile['workplace_address'] : ''); ?>">
-                    </div>
-                </div>
-                <div id="editActualWorkplaceMap" class="workplace-map"></div>
-
-
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-cancel" onclick="closeEditActualWorkplaceModal()">Cancel</button>
-                    <button type="submit" class="btn btn-save">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>-->
-
     <script>
         // Workplace Modal Functions
         let selectedLocation = null;
