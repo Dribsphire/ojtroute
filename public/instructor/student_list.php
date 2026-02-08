@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         wcr.id,
                         wcr.student_id,
                         u.full_name as student_name,
+                        u.profile_pic_path,
                         u.school_id,
                         wcr.workplace_name as new_workplace,
                         wcr.workplace_address as new_address,
@@ -1555,22 +1556,12 @@ function buildPaginationUrl($page_num, $search_term)
                 </button>
             </div>
 
-            <div style="overflow-x: auto;">
-                <table id="requestsTable">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Current Workplace</th>
-                            <th>New Workplace</th>
-                            <th>Reason</th>
-                            <th>Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="requestsTableBody">
-                        <!-- Requests will be loaded here -->
-                    </tbody>
-                </table>
+            <div id="requestsContainer" class="requests-container">
+                <!-- Requests will be loaded here as cards -->
+                <div style="text-align: center; padding: 2rem; color: var(--secondary-text-clr);">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <div style="margin-top: 1rem;">Loading requests...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -1626,8 +1617,12 @@ function buildPaginationUrl($page_num, $search_term)
         });
 
         function fetchRequests() {
-            const tbody = document.getElementById('requestsTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading...</td></tr>';
+            const container = document.getElementById('requestsContainer');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: var(--secondary-text-clr);">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <div style="margin-top: 1rem;">Loading requests...</div>
+                </div>`;
 
             const formData = new FormData();
             formData.append('action', 'get_workplace_requests');
@@ -1641,47 +1636,127 @@ function buildPaginationUrl($page_num, $search_term)
                     if (data.success) {
                         renderRequests(data.data);
                     } else {
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">Error: ${data.error}</td></tr>`;
+                        container.innerHTML = `
+                            <div class="alert-error" style="text-align: center; margin: 2rem;">
+                                <i class="fas fa-exclamation-circle fa-2x"></i>
+                                <div style="margin-top: 0.5rem;">Error: ${data.error}</div>
+                            </div>`;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Failed to load requests</td></tr>';
+                    container.innerHTML = `
+                        <div class="alert-error" style="text-align: center; margin: 2rem;">
+                            <i class="fas fa-wifi fa-2x"></i>
+                            <div style="margin-top: 0.5rem;">Failed to load requests. Please check your connection.</div>
+                        </div>`;
                 });
         }
 
         function renderRequests(requests) {
-            const tbody = document.getElementById('requestsTableBody');
+            const container = document.getElementById('requestsContainer');
 
             if (requests.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No pending requests</td></tr>';
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 4rem 2rem; color: var(--secondary-text-clr); display: flex; flex-direction: column; align-items: center;">
+                        <div style="background: var(--hover-clr); padding: 2rem; border-radius: 50%; margin-bottom: 1.5rem;">
+                            <i class="fas fa-check-circle fa-3x" style="color: var(--accent-clr);"></i>
+                        </div>
+                        <h3>All Caught Up!</h3>
+                        <p>There are no pending workplace change requests at the moment.</p>
+                    </div>`;
                 return;
             }
 
-            tbody.innerHTML = requests.map(req => `
-                <tr>
-                    <td>
-                        <strong>${req.student_name}</strong><br>
-                        <small>${req.school_id}</small>
-                    </td>
-                    <td>${req.current_workplace}</td>
-                    <td>
-                        <strong>${req.new_workplace}</strong><br>
-                        <small>${req.new_address}</small>
-                    </td>
-                    <td>${req.change_reason}</td>
-                    <td>${new Date(req.created_at).toLocaleDateString()}</td>
-                    <td>
-                        <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" 
-                                onclick="openApprovalModal(${req.id}, '${req.student_name.replace(/'/g, "\\'")}')">
-                            Approve
-                        </button>
-                        <button class="btn btn-secondary" style="background: #ff4d4d; color: white; border: none; padding: 5px 10px; font-size: 0.8rem; margin-left: 5px;" 
+            container.innerHTML = requests.map(req => `
+                <div class="request-card">
+                    <div class="req-header">
+                        <div class="req-user">
+                            <img src="${req.profile_pic_path || '../../storage/images/default_profile.jpg'}" class="req-avatar" alt="Profile">
+                            <div>
+                                <div class="req-name">${req.student_name}</div>
+                                <div class="req-id">${req.school_id}</div>
+                            </div>
+                        </div>
+                        <div class="req-meta">
+                            <div class="req-date">
+                                <i class="far fa-calendar-alt"></i> 
+                                ${new Date(req.created_at).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="req-body">
+                        <div class="req-column">
+                            <div class="req-label">Workplace Transition</div>
+                            <div class="workplace-transition">
+                                <div class="wp-box">
+                                    <div class="req-label" style="font-size: 0.7rem;">CURRENT WORKPLACE</div>
+                                    <div class="wp-name" style="color: var(--secondary-text-clr);">${req.current_workplace}</div>
+                                </div>
+                                
+                                <div class="transition-arrow">
+                                    <i class="fas fa-arrow-down"></i> Requesting Transfer To <i class="fas fa-arrow-down"></i>
+                                </div>
+                                
+                                <div class="wp-box">
+                                    <div class="req-label" style="font-size: 0.7rem;">NEW WORKPLACE</div>
+                                    <div class="wp-name">${req.new_workplace}</div>
+                                    <div class="wp-address"><i class="fas fa-map-marker-alt" style="width: 15px; text-align: center; color: var(--accent-clr);"></i> ${req.new_address}</div>
+                                    <div class="wp-pos"><i class="fas fa-briefcase" style="width: 15px; text-align: center; color: var(--accent-clr);"></i> Position: <strong>${req.position_title || 'N/A'}</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="req-column">
+                             <div class="req-label">Key Personnel</div>
+                             <div class="req-info-grid">
+                                <div class="info-card">
+                                    <div class="info-card-header">
+                                        <i class="fas fa-user-tie"></i> Supervisor
+                                    </div>
+                                    <div class="info-card-content">
+                                        <div style="font-weight: 600;">${req.supervisor_name || 'N/A'}</div>
+                                        <div style="color: var(--secondary-text-clr); font-size: 0.85rem;">${req.supervisor_position || 'Position N/A'}</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-card">
+                                    <div class="info-card-header">
+                                        <i class="fas fa-user-graduate"></i> Head Trainee
+                                    </div>
+                                    <div class="info-card-content">
+                                        <div style="font-weight: 600;">${req.head_trainee || 'N/A'}</div>
+                                        <div style="color: var(--secondary-text-clr); font-size: 0.85rem; margin-bottom: 0.5rem;">${req.head_trainee_position || 'Position N/A'}</div>
+                                        
+                                        <div class="info-contact">
+                                            ${req.head_trainee_contact ? `<div><i class="fas fa-phone-alt"></i> ${req.head_trainee_contact}</div>` : ''}
+                                            ${req.head_trainee_email ? `<div><i class="fas fa-envelope"></i> ${req.head_trainee_email}</div>` : ''}
+                                            ${!req.head_trainee_contact && !req.head_trainee_email ? '<div>No contact info provided</div>' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <div class="req-reason-section">
+                        <div class="req-label" style="margin-bottom: 0.5rem; color: #856404;">REASON FOR CHANGE</div>
+                        <div class="req-reason-text">${req.change_reason}</div>
+                    </div>
+
+                    <div class="req-actions">
+                        <button class="btn btn-secondary" style="background-color: transparent; border-color: #ff4d4d; color: #ff4d4d;" 
+                                onmouseover="this.style.backgroundColor='#ff4d4d'; this.style.color='white'"
+                                onmouseout="this.style.backgroundColor='transparent'; this.style.color='#ff4d4d'"
                                 onclick="rejectRequest(${req.id})">
-                            Reject
+                            <i class="fas fa-times"></i> Reject Request
                         </button>
-                    </td>
-                </tr>
+                        <button class="btn btn-primary" onclick="openApprovalModal(${req.id}, '${req.student_name.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-check"></i> Approve Request
+                        </button>
+                    </div>
+                </div><br>
             `).join('');
         }
 
@@ -1969,12 +2044,245 @@ function buildPaginationUrl($page_num, $search_term)
             border-radius: 0.25rem;
         }
 
-        .alert-warning {
-            color: #ffc107;
-            background-color: rgba(255, 193, 7, 0.1);
-            border: 1px solid #ffc107;
-            padding: 0.75rem;
-            border-radius: 0.25rem;
+        }
+
+        /* Modern Request Card UI */
+        .requests-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 0.5rem;
+        }
+
+        .request-card {
+            background: var(--base-clr);
+            border: 1px solid var(--line-clr);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .request-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+            border-color: var(--accent-clr);
+        }
+
+        .request-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--accent-clr);
+            opacity: 0.7;
+        }
+
+        .req-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--line-clr);
+        }
+
+        .req-user {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .req-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--accent-clr);
+        }
+
+        .req-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-clr);
+        }
+
+        .req-id {
+            font-size: 0.85rem;
+            color: var(--secondary-text-clr);
+        }
+
+        .req-meta {
+            text-align: right;
+        }
+
+        .req-date {
+            font-size: 0.9rem;
+            color: var(--secondary-text-clr);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .req-body {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .req-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .req-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--secondary-text-clr);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .workplace-transition {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: rgba(0, 0, 0, 0.02);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--line-clr);
+        }
+
+        .wp-box {
+            position: relative;
+        }
+
+        .wp-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--accent-clr);
+        }
+
+        .wp-address {
+            font-size: 0.9rem;
+            color: var(--text-clr);
+            margin-top: 0.25rem;
+        }
+
+        .wp-pos {
+            font-size: 0.85rem;
+            color: var(--secondary-text-clr);
+            margin-top: 0.25rem;
+        }
+
+        .transition-arrow {
+            text-align: center;
+            color: var(--secondary-text-clr);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .req-info-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .info-card {
+            background: rgba(26, 210, 28, 0.05);
+            /* Tint of accent hue */
+            border: 1px solid rgba(26, 210, 28, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .info-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--accent-clr);
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(26, 210, 28, 0.1);
+        }
+
+        .info-card-content {
+            font-size: 0.9rem;
+        }
+
+        .info-contact {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--secondary-text-clr);
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .info-contact i {
+            width: 16px;
+            color: var(--accent-clr);
+        }
+
+        .req-reason-section {
+            background: var(--hover-clr);
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 3px solid #ffc107;
+            /* Warning yellow for attention */
+        }
+
+        .req-reason-text {
+            font-style: italic;
+            color: var(--text-clr);
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .req-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--line-clr);
+        }
+
+        @media (max-width: 768px) {
+            .req-body {
+                grid-template-columns: 1fr;
+            }
+
+            .req-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .req-meta {
+                text-align: left;
+            }
+
+            .req-actions {
+                flex-direction: column;
+            }
+
+            .req-actions button {
+                width: 100%;
+            }
         }
     </style>
 
@@ -2140,16 +2448,22 @@ function buildPaginationUrl($page_num, $search_term)
         }
 
         // Add event listener for compose email button
-        document.getElementById('composeEmail').addEventListener('click', function () {
-            openModal('emailModal');
-        });
+        const composeEmailBtn = document.getElementById('composeEmail');
+        if (composeEmailBtn) {
+            composeEmailBtn.addEventListener('click', function () {
+                openModal('emailModal');
+            });
+        }
 
         // Close modal when clicking outside
-        document.getElementById('emailModal').addEventListener('click', function (event) {
-            if (event.target === this) {
-                closeModal('emailModal');
-            }
-        });
+        const emailModal = document.getElementById('emailModal');
+        if (emailModal) {
+            emailModal.addEventListener('click', function (event) {
+                if (event.target === this) {
+                    closeModal('emailModal');
+                }
+            });
+        }
 
         // Function to check workplace change request count
         function checkWorkplaceRequests() {
@@ -2191,10 +2505,13 @@ function buildPaginationUrl($page_num, $search_term)
         // Check every 15 seconds for new requests
         setInterval(checkWorkplaceRequests, 15000);
         // Excel Export Functionality
-        document.getElementById('exportCSV').innerHTML = '<i class="fas fa-file-excel"></i> Export Excel';
-        document.getElementById('exportCSV').addEventListener('click', function () {
-            window.location.href = 'export_reports_instructor.php';
-        });
+        const exportBtn = document.getElementById('exportCSV');
+        if (exportBtn) {
+            exportBtn.innerHTML = '<i class="fas fa-file-excel"></i> Export Excel';
+            exportBtn.addEventListener('click', function () {
+                window.location.href = 'export_reports_instructor.php';
+            });
+        }
 
 
     </script>

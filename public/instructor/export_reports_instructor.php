@@ -1,23 +1,43 @@
 <?php
+ob_start();
+
 /**
  * Export Student Reports to Excel (.xls)
  * Allows for colored rows and custom styling not possible in CSV
  */
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../app/middleware/requireInstructor.php';
-require_once __DIR__ . '/../admin/points_breakdown_helper.php';
-
-use App\Services\ReportsService;
 use App\Services\InstructorService;
 
-// Set headers for Excel download
-header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-header('Content-Disposition: attachment; filename="ITEOJT_Reports_' . date('Y-m-d_His') . '.xls"');
-header('Pragma: no-cache');
-header('Expires: 0');
-
 try {
+    // 1. Dependency Check: Autoload
+    $autoloadPath = __DIR__ . '/../../vendor/autoload.php';
+    if (!file_exists($autoloadPath)) {
+        throw new \Exception("Critical Error: Composer autoload missing. Path: " . $autoloadPath);
+    }
+    require_once $autoloadPath;
+
+    // 2. Dependency Check: Points Helper
+    $helperPath = __DIR__ . '/../admin/points_breakdown_helper.php';
+    if (!file_exists($helperPath)) {
+        throw new \Exception("System file missing: points_breakdown_helper.php");
+    }
+    require_once $helperPath;
+
+    // 3. Explicitly load InstructorService to bypass case-sensitive autoload issues
+    $servicePath = __DIR__ . '/../../app/services/InstructorService.php';
+    if (file_exists($servicePath)) {
+        require_once $servicePath;
+    } else {
+        throw new \Exception("Service file missing: InstructorService.php");
+    }
+
+    require_once __DIR__ . '/../../app/middleware/requireInstructor.php';
+
+    // Set headers for Excel download
+    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+    header('Content-Disposition: attachment; filename="ITEOJT_Reports_' . date('Y-m-d_His') . '.xls"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     $config = require __DIR__ . '/../../config/database.php';
     $dsn = "mysql:host={$config['host']};dbname={$config['dbname']};charset={$config['charset']}";
     $pdo = new PDO($dsn, $config['username'], $config['password'], $config['options']);
@@ -250,8 +270,17 @@ try {
     echo '</body>';
     echo '</html>';
 
-} catch (Exception $e) {
-    echo "Error generating Report: " . $e->getMessage();
+} catch (\Throwable $e) {
+    // Clear any partial output
+    if (ob_get_length())
+        ob_clean();
+
+    // Reset headers to text/html to show error cleanly
+    header('Content-Type: text/html; charset=utf-8');
+    header('Content-Disposition: inline');
+
+    echo "Error generating Report: " . htmlspecialchars($e->getMessage());
+    error_log("Export Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
 }
 
 /**

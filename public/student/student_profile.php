@@ -1270,26 +1270,26 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
             <div class="detail-card">
                 <h3>System Administrator</h3>
                 <?php if (!empty($student_profile['admins'])): ?>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
-                            <?php foreach ($student_profile['admins'] as $admin): ?>
-                                    <div class="admin-card" style="text-align: center;">
-                                        <img src="<?php echo htmlspecialchars($admin['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
-                                            alt="<?php echo htmlspecialchars($admin['full_name']); ?>" class="admin-pic"
-                                            style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem;">
-                                        <div class="admin-name" style="font-weight: 600; font-size: 0.9rem;">
-                                            <?php echo htmlspecialchars($admin['full_name']); ?>
-                                        </div>
-                                    </div>
-                            <?php endforeach; ?>
-                        </div>
-                <?php else: ?>
-                        <div class="admin-card">
-                            <img src="../../storage/images/default_profile.jpg" alt="Admin" class="admin-pic">
-                            <div class="admin-info">
-                                <div class="admin-name">System Administrator</div>
-                                <div class="admin-role">OJT Chairperson</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
+                        <?php foreach ($student_profile['admins'] as $admin): ?>
+                            <div class="admin-card" style="text-align: center;">
+                                <img src="<?php echo htmlspecialchars($admin['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
+                                    alt="<?php echo htmlspecialchars($admin['full_name']); ?>" class="admin-pic"
+                                    style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem;">
+                                <div class="admin-name" style="font-weight: 600; font-size: 0.9rem;">
+                                    <?php echo htmlspecialchars($admin['full_name']); ?>
+                                </div>
                             </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="admin-card">
+                        <img src="../../storage/images/default_profile.jpg" alt="Admin" class="admin-pic">
+                        <div class="admin-info">
+                            <div class="admin-name">System Administrator</div>
+                            <div class="admin-role">OJT Chairperson</div>
                         </div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div><br>
@@ -1420,30 +1420,30 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
             </style>
             <div class="classmate-grid">
                 <?php if (!empty($student_profile['classmates'])): ?>
-                        <?php
-                        $totalClassmates = count($student_profile['classmates']);
-                        $showLimit = 20;
-                        ?>
-                        <?php foreach ($student_profile['classmates'] as $index => $classmate): ?>
-                                <div class="classmate-card <?php echo $index >= $showLimit ? 'hidden-classmate' : ''; ?>">
-                                    <img src="<?php echo htmlspecialchars($classmate['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
-                                        alt="<?php echo htmlspecialchars($classmate['full_name']); ?>" class="classmate-pic">
-                                    <div class="classmate-info">
-                                        <span class="classmate-name"><?php echo htmlspecialchars($classmate['full_name']); ?></span>
-                                    </div>
-                                </div>
-                        <?php endforeach; ?>
-                        <?php if ($totalClassmates > $showLimit): ?>
-                                <button class="show-more-btn" onclick="toggleClassmates(this)">
-                                    <i class="fas fa-chevron-down"></i>
-                                    Show More (<?php echo $totalClassmates - $showLimit; ?> more)
-                                </button>
-                        <?php endif; ?>
-                <?php else: ?>
-                        <div
-                            style="grid-column: 1 / -1; text-align: center; color: var(--secondary-text-clr); font-style: italic;">
-                            No classmates found.
+                    <?php
+                    $totalClassmates = count($student_profile['classmates']);
+                    $showLimit = 20;
+                    ?>
+                    <?php foreach ($student_profile['classmates'] as $index => $classmate): ?>
+                        <div class="classmate-card <?php echo $index >= $showLimit ? 'hidden-classmate' : ''; ?>">
+                            <img src="<?php echo htmlspecialchars($classmate['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
+                                alt="<?php echo htmlspecialchars($classmate['full_name']); ?>" class="classmate-pic">
+                            <div class="classmate-info">
+                                <span class="classmate-name"><?php echo htmlspecialchars($classmate['full_name']); ?></span>
+                            </div>
                         </div>
+                    <?php endforeach; ?>
+                    <?php if ($totalClassmates > $showLimit): ?>
+                        <button class="show-more-btn" onclick="toggleClassmates(this)">
+                            <i class="fas fa-chevron-down"></i>
+                            Show More (<?php echo $totalClassmates - $showLimit; ?> more)
+                        </button>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div
+                        style="grid-column: 1 / -1; text-align: center; color: var(--secondary-text-clr); font-style: italic;">
+                        No classmates found.
+                    </div>
                 <?php endif; ?>
             </div>
         </div><br>
@@ -1571,10 +1571,10 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
 
             <form id="workplaceForm" onsubmit="saveWorkplace(event)">
                 <?php if ($hasWorkplace): ?>
-                        <div class="change-notice">
-                            <i class="fas fa-info-circle"></i>
-                            <span>You have already set your workplace. Any changes require instructor approval.</span>
-                        </div>
+                    <div class="change-notice">
+                        <i class="fas fa-info-circle"></i>
+                        <span>You have already set your workplace. Any changes require instructor approval.</span>
+                    </div>
                 <?php endif; ?>
 
                 <div class="workplace-map-container">
@@ -1665,12 +1665,12 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
                     </div>
                 </div>
                 <?php if ($hasWorkplace): ?>
-                        <div class="form-group">
-                            <label class="form-label" for="change_reason">Reason for Change *</label>
-                            <textarea id="change_reason" name="change_reason" class="form-input" rows="4"
-                                placeholder="Please explain why you need to change your OJT workplace location..."
-                                required></textarea>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label" for="change_reason">Reason for Change *</label>
+                        <textarea id="change_reason" name="change_reason" class="form-input" rows="4"
+                            placeholder="Please explain why you need to change your OJT workplace location..."
+                            required></textarea>
+                    </div>
                 <?php endif; ?>
 
                 <div class="modal-footer">
@@ -2034,13 +2034,37 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
             formData.append('latitude', selectedLocation.lat);
             formData.append('longitude', selectedLocation.lng);
 
+
+
             // Send data to server via AJAX
             fetch('student_profile.php', {
                 method: 'POST',
                 body: formData
             })
-                .then(response => response.json())
+                .then(response => {
+                    // DEBUG: Log response status and headers
+                    console.log('Response Status:', response.status);
+                    console.log('Response OK:', response.ok);
+                    console.log('Response Headers:');
+                    response.headers.forEach((value, key) => {
+                        console.log(`  ${key}: ${value}`);
+                    });
+
+                    // Clone response to read text first for debugging
+                    return response.clone().text().then(rawText => {
+                        console.log('Raw Response Text:', rawText);
+                        // Try to parse as JSON
+                        try {
+                            return JSON.parse(rawText);
+                        } catch (e) {
+                            console.error('JSON Parse Error:', e);
+                            console.error('Response was not valid JSON. Raw content above.');
+                            throw new Error('Server did not return valid JSON. Check console for raw response.');
+                        }
+                    });
+                })
                 .then(result => {
+                    console.log('Parsed Result:', result);
                     if (result.success) {
                         showNotification(result.message || 'Success!', 'success');
                         closeWorkplaceModal();
@@ -2054,11 +2078,12 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
                         // Reload page after 1.5 seconds to show updated data
                         setTimeout(() => location.reload(), 1500);
                     } else {
+                        console.log('Server returned error:', result.error);
                         showNotification(result.error || 'Failed to submit request', 'error');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
+                    console.error('Fetch/Parse Error:', error);
                     showNotification('An error occurred while submitting request', 'error');
                 });
         }

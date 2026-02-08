@@ -371,6 +371,18 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             margin-top: 0.75rem;
         }
 
+        /* Mobile Card Layout */
+        .timeout-card {
+            display: none;
+        }
+
+        .timeout-cards-container {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
         /* Responsive Design */
         @media (max-width: 1024px) {
             .timeouts-container {
@@ -381,7 +393,11 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
 
         @media (max-width: 768px) {
             .timeouts-container {
-                padding: 0 0.75rem;
+                padding: 0.5rem;
+                width: 20rem;
+                max-width: 100%;
+                margin: 0 auto;
+                box-sizing: border-box;
             }
 
             .timeouts-card {
@@ -391,12 +407,17 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
 
             .header-row {
                 flex-direction: column;
-                gap: 1rem;
+                gap: 0.75rem;
                 align-items: stretch;
             }
 
             .header-row h1 {
-                font-size: 1.5rem;
+                font-size: 1.4rem;
+                text-align: center;
+            }
+
+            .header-row p {
+                font-size: 0.85rem;
                 text-align: center;
             }
 
@@ -405,44 +426,165 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                 justify-content: center;
             }
 
-            /* Make table scrollable horizontally */
+            /* Hide table on mobile, show cards */
             .table-wrap {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                display: none;
             }
 
-            table {
-                min-width: 800px;
+            .timeout-cards-container {
+                display: flex;
             }
 
-            th,
-            td {
-                padding: 0.75rem 0.5rem;
+            .timeout-card {
+                display: block;
+                background: rgba(0, 0, 0, 0.15);
+                border-radius: 12px;
+                padding: 1rem;
+                border: 1px solid var(--line-clr);
+                transition: all 0.2s ease;
+            }
+
+            .timeout-card:active {
+                transform: scale(0.98);
+            }
+
+            .timeout-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 0.75rem;
+                gap: 0.5rem;
+            }
+
+            .timeout-card-date {
+                font-weight: 600;
+                color: #fff;
+                font-size: 0.95rem;
+            }
+
+            .timeout-card-block {
+                font-size: 0.8rem;
+                color: var(--secondary-text-clr);
+                margin-top: 0.25rem;
+            }
+
+            .timeout-card-body {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .timeout-card-item {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .timeout-card-label {
+                font-size: 0.7rem;
+                color: var(--secondary-text-clr);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .timeout-card-value {
                 font-size: 0.85rem;
+                color: var(--text-clr);
             }
 
-            .status {
+            .timeout-card-reason {
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 8px;
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+                border-left: 3px solid var(--accent-clr);
+            }
+
+            .timeout-card-reason-label {
+                font-size: 0.7rem;
+                color: var(--secondary-text-clr);
+                text-transform: uppercase;
+                margin-bottom: 0.25rem;
+            }
+
+            .timeout-card-reason-text {
+                font-size: 0.85rem;
+                color: var(--text-clr);
+            }
+
+            .timeout-card-response {
+                background: rgba(255, 140, 0, 0.1);
+                border-radius: 8px;
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+                border-left: 3px solid #ff8c00;
+            }
+
+            .timeout-card-response-label {
+                font-size: 0.7rem;
+                color: #ff8c00;
+                text-transform: uppercase;
+                margin-bottom: 0.25rem;
+            }
+
+            .timeout-card-response-text {
+                font-size: 0.85rem;
+                color: #ff8c00;
+            }
+
+            .timeout-card-actions {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+            }
+
+            .timeout-card-actions .icon-btn {
+                flex: 1;
+                min-width: 70px;
+                padding: 0.6rem 0.75rem;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                font-size: 0.85rem;
+                border-radius: 8px;
+            }
+
+            .timeout-card-actions .icon-btn i {
+                font-size: 0.9rem;
+            }
+
+            .status-badge {
                 font-size: 0.75rem;
-                padding: 0.3rem 0.6rem;
+                padding: 0.2rem 0.6rem;
             }
 
-            .icon-btn {
-                padding: 0.4rem 0.6rem;
-                font-size: 0.85rem;
-            }
-
+            /* Modal improvements */
             .modal-content {
-                width: 95%;
-                max-width: none;
-                margin: 1rem;
+                width: 19rem;
+                max-width: 95%;
+                margin: 1rem auto;
+                max-height: 90vh;
+                overflow-y: auto;
             }
 
             .modal-header {
-                padding: 0.75rem 1rem;
+                padding: 1rem;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background: var(--base-clr);
             }
 
             .modal-header h3 {
                 font-size: 1rem;
+            }
+
+            .modal-close {
+                font-size: 1rem;
+                padding: 0.4rem 0.6rem;
             }
 
             .modal-body {
@@ -471,22 +613,30 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             .modal-actions button {
                 width: 100%;
             }
+
+            .preview-frame,
+            .preview-image {
+                height: 50vh;
+            }
         }
 
-        @media (max-width: 480px) {
+        @media (max-width: 400px) {
             .timeouts-container {
-                padding: 0 0.5rem;
+                padding: 0.25rem;
+                width: 20rem;
+                max-width: 100%;
             }
 
             .timeouts-card {
                 padding: 0.75rem;
-                border-radius: 0.5em;
-                width: 18rem;
-                height: 38rem;
             }
 
             .header-row h1 {
-                font-size: 1.3rem;
+                font-size: 1.25rem;
+            }
+
+            .header-row p {
+                font-size: 0.8rem;
             }
 
             .primary-btn {
@@ -494,57 +644,49 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                 font-size: 0.9rem;
             }
 
-            .primary-btn i {
+            .timeout-card {
+                padding: 0.75rem;
+            }
+
+            .timeout-card-header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .timeout-card-date {
                 font-size: 0.9rem;
             }
 
-            table {
-                min-width: 700px;
+            .timeout-card-body {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
             }
 
-            th,
-            td {
-                padding: 0.6rem 0.4rem;
-                font-size: 0.8rem;
+            .timeout-card-actions {
+                gap: 0.35rem;
             }
 
-            th {
+            .timeout-card-actions .icon-btn {
+                padding: 0.5rem 0.5rem;
+                font-size: 0.75rem;
+                min-width: 60px;
+            }
+
+            .status-badge {
                 font-size: 0.7rem;
-            }
-
-            .status {
-                font-size: 0.7rem;
-                padding: 0.25rem 0.5rem;
-                min-width: 70px;
-            }
-
-            .icon-btn {
-                padding: 0.35rem 0.5rem;
-                font-size: 0.8rem;
-                margin-right: 0.25rem;
-            }
-
-            .icon-btn i {
-                font-size: 0.85rem;
+                padding: 0.15rem 0.5rem;
             }
 
             .modal-content {
-                width: 100%;
-                max-height: 95vh;
-                margin: 0.5rem;
+                width: 18rem;
             }
 
             .modal-header {
-                padding: 0.6rem 0.75rem;
+                padding: 0.75rem;
             }
 
             .modal-header h3 {
                 font-size: 0.95rem;
-            }
-
-            .modal-close {
-                padding: 0.3rem 0.5rem;
-                font-size: 0.9rem;
             }
 
             .modal-body {
@@ -572,12 +714,9 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                 font-size: 0.85rem;
             }
 
-            .file-preview {
-                padding: 0.6rem;
-            }
-
-            .download-row {
-                margin-top: 0.5rem;
+            .preview-frame,
+            .preview-image {
+                height: 40vh;
             }
         }
     </style>
@@ -613,6 +752,9 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                         <tbody id="timeoutsTbody"></tbody>
                     </table>
                 </div>
+
+                <!-- Mobile Cards Container -->
+                <div class="timeout-cards-container" id="timeoutCardsContainer"></div>
             </div>
         </div>
 
@@ -745,17 +887,48 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
         }
 
         function renderTable() {
+            const cardsContainer = document.getElementById('timeoutCardsContainer');
+
             if (!tbody) return;
 
             if (!timeouts.length) {
                 tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding: 1.25rem; text-align: center;">No missing timeout records found.</td></tr>';
+                if (cardsContainer) {
+                    cardsContainer.innerHTML = '<div class="muted" style="padding: 1.25rem; text-align: center;">No missing timeout records found.</div>';
+                }
                 return;
             }
 
+            // Render table rows
             tbody.innerHTML = timeouts.map((r) => {
                 const fileLabel = r.letter_file_name || 'View file';
                 const fileHref = r.letter_file_path || '#';
                 const hasDocument = !!r.letter_file_path;
+                const isApproved = (r.status || '').toLowerCase() === 'approved';
+
+                // Determine what to show in actions column
+                let actionsHtml = '';
+                if (hasDocument) {
+                    actionsHtml += `
+                        <button class="icon-btn view" type="button" title="View Document" aria-label="View Document" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    `;
+                }
+
+                if (isApproved) {
+                    // Approved status - don't show attach button
+                    if (!hasDocument) {
+                        actionsHtml += '<span class="muted" style="font-size: 0.8rem;">No document</span>';
+                    }
+                } else {
+                    // Not approved - show attach button
+                    actionsHtml += `
+                        <button class="icon-btn attach" type="button" title="${hasDocument ? 'Update Document' : 'Attach Document'}" aria-label="${hasDocument ? 'Update Document' : 'Attach Document'}" data-action="attach" data-id="${r.id}">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                    `;
+                }
 
                 return `
                     <tr data-id="${r.id}">
@@ -775,19 +948,95 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                         <td>${r.instructor_response ? r.instructor_response : '<span class="muted">-</span>'}</td>
                         <td>
                             <div class="action-buttons">
-                                ${hasDocument ? `
-                                    <button class="icon-btn view" type="button" title="View Document" aria-label="View Document" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                ` : ''}
-                                <button class="icon-btn attach" type="button" title="${hasDocument ? 'Update Document' : 'Attach Document'}" aria-label="${hasDocument ? 'Update Document' : 'Attach Document'}" data-action="attach" data-id="${r.id}">
-                                    <i class="fas fa-paperclip"></i>
-                                </button>
+                                ${actionsHtml}
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+
+            // Render mobile cards
+            if (cardsContainer) {
+                cardsContainer.innerHTML = timeouts.map((r) => {
+                    const fileLabel = r.letter_file_name || 'View file';
+                    const fileHref = r.letter_file_path || '#';
+                    const hasDocument = !!r.letter_file_path;
+                    const isApproved = (r.status || '').toLowerCase() === 'approved';
+
+                    // Determine what to show in card actions
+                    let cardActionsHtml = '';
+                    if (hasDocument) {
+                        cardActionsHtml += `
+                            <button class="icon-btn view" type="button" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        `;
+                    }
+
+                    if (isApproved) {
+                        // Approved status - don't show attach button
+                        if (!hasDocument) {
+                            cardActionsHtml += '<span class="muted" style="font-size: 0.85rem; padding: 0.5rem;">No document attached</span>';
+                        }
+                    } else {
+                        // Not approved - show attach button
+                        cardActionsHtml += `
+                            <button class="icon-btn attach" type="button" data-action="attach" data-id="${r.id}">
+                                <i class="fas fa-paperclip"></i> ${hasDocument ? 'Update' : 'Attach'}
+                            </button>
+                        `;
+                    }
+
+                    return `
+                        <div class="timeout-card" data-id="${r.id}">
+                            <!-- Card Header -->
+                            <div class="timeout-card-header">
+                                <div>
+                                    <div class="timeout-card-date">
+                                        <i class="fas fa-calendar-alt" style="margin-right: 0.5rem; opacity: 0.7;"></i>
+                                        ${formatDate(r.attendance_date)}
+                                    </div>
+                                    <div class="timeout-card-block">${r.block_type || '-'}</div>
+                                </div>
+                                ${r.status ? getStatusBadge(r.status) : '<span class="status-badge status-pending">Not submitted</span>'}
+                            </div>
+                            
+                            <!-- Card Body -->
+                            <div class="timeout-card-body">
+                                <div class="timeout-card-item">
+                                    <span class="timeout-card-label">Time In</span>
+                                    <span class="timeout-card-value">${formatTime(r.time_in)}</span>
+                                </div>
+                                <div class="timeout-card-item">
+                                    <span class="timeout-card-label">Document</span>
+                                    <span class="timeout-card-value">
+                                        ${hasDocument ? `<a href="#" class="file-link" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}" style="font-size: 0.85rem;"><i class="fas fa-file"></i> ${fileLabel.length > 15 ? fileLabel.substring(0, 15) + '...' : fileLabel}</a>` : '<span class="muted">Not attached</span>'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            ${r.reason ? `
+                                <div class="timeout-card-reason">
+                                    <div class="timeout-card-reason-label"><i class="fas fa-comment-alt"></i> Reason</div>
+                                    <div class="timeout-card-reason-text">${r.reason}</div>
+                                </div>
+                            ` : ''}
+                            
+                            ${r.instructor_response ? `
+                                <div class="timeout-card-response">
+                                    <div class="timeout-card-response-label"><i class="fas fa-reply"></i> Instructor Response</div>
+                                    <div class="timeout-card-response-text">${r.instructor_response}</div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Card Actions -->
+                            <div class="timeout-card-actions">
+                                ${cardActionsHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
         }
 
         function setPreview(fileUrl, fileName) {

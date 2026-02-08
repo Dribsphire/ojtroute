@@ -446,6 +446,162 @@ foreach ($todayAttendance as $record) {
         .time-in-btn i {
             font-size: 1rem;
         }
+
+        /* Responsive Styles for Mobile */
+        @media (max-width: 800px) {
+            .attendance-container {
+                padding: 0;
+            }
+
+            .attendance-container h1 {
+                font-size: 1.5rem;
+                text-align: center;
+                margin-bottom: 0.5rem;
+            }
+
+            .alert-banner {
+                padding: 1rem;
+                margin-bottom: 1rem;
+                font-size: 0.9rem;
+                flex-direction: column;
+                text-align: center;
+                gap: 0.5rem;
+            }
+
+            .alert-banner i {
+                font-size: 1.5rem;
+            }
+
+            .map-container {
+                height: 12rem;
+                margin-bottom: 1rem;
+                border-radius: 8px;
+            }
+
+            .attendance-blocks {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-bottom: 80px;
+                /* Extra margin to prevent overlap with fixed bottom nav */
+                padding-bottom: 1rem;
+            }
+
+            .attendance-block {
+                padding: 1rem;
+                border-radius: 8px;
+                transform: none !important;
+                /* Disable transform that creates stacking context */
+            }
+
+            .attendance-block:hover {
+                transform: none !important;
+                /* Disable hover transform on mobile */
+            }
+
+            .time-in-btn:hover {
+                transform: none !important;
+                /* Disable hover transform on mobile */
+            }
+
+            .block-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .block-header h3 {
+                font-size: 0.95rem;
+            }
+
+            .status-badge {
+                font-size: 0.75rem;
+                padding: 0.2rem 0.6rem;
+            }
+
+            .time-range {
+                font-size: 0.85rem;
+                margin: 0.25rem 0 1rem;
+            }
+
+            .time-in-btn {
+                padding: 0.65rem;
+                font-size: 0.9rem;
+            }
+
+            .time-in-btn i {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Extra small devices */
+        @media (max-width: 480px) {
+            .attendance-container h1 {
+                font-size: 1.25rem;
+            }
+
+            .alert-banner {
+                padding: 0.75rem;
+                font-size: 0.85rem;
+                border-left-width: 3px;
+            }
+
+            .map-container {
+                height: 10rem;
+            }
+
+            .attendance-block {
+                padding: 0.85rem;
+            }
+
+            .block-header h3 {
+                font-size: 0.9rem;
+            }
+
+            .status-badge {
+                font-size: 0.7rem;
+            }
+
+            .time-range {
+                font-size: 0.8rem;
+            }
+
+            .time-in-btn {
+                padding: 0.6rem;
+                font-size: 0.85rem;
+            }
+
+            /* Camera Modal Responsive */
+            .modal-content {
+                width: 95%;
+                padding: 1rem;
+                max-height: 85vh;
+            }
+
+            .modal-header {
+                margin-bottom: 1rem;
+                padding-bottom: 0.75rem;
+            }
+
+            .modal-header h3 {
+                font-size: 1.1rem;
+            }
+
+            .camera-container {
+                margin-bottom: 1rem;
+            }
+
+            .camera-controls {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+
+            .btn {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
     </style>
 
     <script>
@@ -526,16 +682,18 @@ foreach ($todayAttendance as $record) {
             const canvas = document.getElementById('photoCanvas');
             const photoPreview = document.getElementById('photoPreview');
 
-            // Set canvas dimensions to match video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            // Resize to max 640px width for faster upload while maintaining aspect ratio
+            const maxWidth = 640;
+            const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
+            canvas.width = video.videoWidth * scale;
+            canvas.height = video.videoHeight * scale;
 
-            // Draw current video frame to canvas
+            // Draw current video frame to canvas (resized)
             const context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Convert canvas to data URL and display in preview
-            const imageDataUrl = canvas.toDataURL('image/png');
+            // Convert canvas to JPEG with 60% quality for much smaller file size
+            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.6);
             capturedPhotoData = imageDataUrl; // Store for submission
             photoPreview.style.backgroundImage = `url(${imageDataUrl})`;
             photoPreview.style.display = 'block';
@@ -653,15 +811,8 @@ foreach ($todayAttendance as $record) {
                     if (data.success) {
                         alert(data.message);
                         closeCameraModal();
-                        // Button state will be handled by real-time updater or we force it here?
-                        // Force it here for immediate feedback
-                        const btn = document.querySelector(`.time-in-btn[data-block="${block}"]`);
-                        if (btn) {
-                            btn.innerHTML = '<i class="fas fa-check-circle"></i> Time In Recorded';
-                            btn.style.background = '#32cd32';
-                            btn.disabled = true;
-                            btn.classList.add('recorded');
-                        }
+                        // Refresh the page to show updated status
+                        window.location.reload();
                     } else {
                         alert("Submission Failed: " + data.message);
                     }
@@ -996,12 +1147,23 @@ foreach ($todayAttendance as $record) {
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            alert(data.message);
-                            // Update local state
-                            if (!recordedBlocks[block]) recordedBlocks[block] = {};
-                            recordedBlocks[block].status = 'completed';
-                            recordedBlocks[block].time_out = new Date().toISOString();
-                            updateBlockButtons();
+                            // Format block name for display
+                            const blockNames = {
+                                'morning': 'Morning Block',
+                                'afternoon': 'Afternoon Block',
+                                'overtime': 'Overtime Block'
+                            };
+                            const blockName = blockNames[block] || block;
+
+                            // Show hours worked if available
+                            let message = data.message;
+                            if (data.hours_worked !== undefined) {
+                                message += `\n\n📊 ${blockName} Summary:\nHours Worked: ${data.hours_worked} hours`;
+                            }
+
+                            alert(message);
+                            // Refresh page to show updated status
+                            window.location.reload();
                         } else {
                             alert(data.message);
                         }

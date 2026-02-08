@@ -186,6 +186,15 @@ $documents = $studentService->getStudentDocuments($userId);
             border-color: orange;
         }
 
+        .action-btn.reupload {
+            color: #9b59b6;
+            border-color: #9b59b6;
+        }
+
+        .action-btn.reupload:hover {
+            background: rgba(155, 89, 182, 0.1);
+        }
+
         .document-name {
             display: flex;
             align-items: center;
@@ -312,10 +321,21 @@ $documents = $studentService->getStudentDocuments($userId);
             border: none;
         }
 
+        /* Mobile Card Layout */
+        .document-card {
+            display: none;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         /* Responsive Design */
-        @media (max-width: 768px) {
+        @media (max-width: 992px) {
             .document-container {
-                padding: 1rem;
+                padding: 1.5rem 1rem;
             }
 
             .nav-pills {
@@ -323,6 +343,13 @@ $documents = $studentService->getStudentDocuments($userId);
                 overflow-x: auto;
                 flex-wrap: nowrap;
                 padding-bottom: 0.5rem;
+                margin: 1rem 0;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .nav-pills::-webkit-scrollbar {
+                display: none;
             }
 
             .nav-link {
@@ -332,18 +359,7 @@ $documents = $studentService->getStudentDocuments($userId);
             }
 
             .search-container {
-                max-width: 90%;
-            }
-
-            /* Make table scrollable horizontally */
-            .table-responsive {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                width: 19rem;
-            }
-
-            .documents-table {
-                min-width: 18rem;
+                max-width: 100%;
             }
 
             .documents-table th,
@@ -351,25 +367,209 @@ $documents = $studentService->getStudentDocuments($userId);
                 padding: 0.75rem 0.5rem;
                 font-size: 0.85rem;
             }
+        }
+
+        @media (max-width: 768px) {
+            .document-container {
+                padding: 1rem 0.5rem;
+                width: 20rem;
+                max-width: 100%;
+                box-sizing: border-box;
+                margin: 0 auto;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .nav-pills {
+                gap: 0.25rem;
+                margin: 0.75rem 0;
+                padding: 0.5rem 0;
+            }
+
+            .nav-link {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+                border-radius: 20px;
+                background: #2a2b3a;
+                border: 1px solid #3e3f4d;
+            }
+
+            .nav-link.active {
+                background: var(--accent-clr);
+                color: #fff;
+                border-color: var(--accent-clr);
+                border-bottom: none;
+            }
+
+            .search-container {
+                margin: 1rem 0;
+            }
+
+            .search-container input {
+                padding: 0.75rem 1rem;
+                font-size: 1rem;
+                border-radius: 25px;
+            }
+
+            /* Hide table on mobile, show cards */
+            .table-responsive {
+                display: none;
+            }
+
+            .document-cards-container {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .document-card {
+                display: block;
+                background: #2a2b3a;
+                border-radius: 12px;
+                padding: 1rem;
+                border: 1px solid #3e3f4d;
+                transition: all 0.2s ease;
+            }
+
+            .document-card:active {
+                transform: scale(0.98);
+            }
+
+            .document-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 0.75rem;
+            }
+
+            .document-card-title {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-weight: 600;
+                color: #fff;
+                font-size: 0.95rem;
+                flex: 1;
+            }
+
+            .document-card-title i {
+                color: var(--accent-clr);
+            }
+
+            .document-card-code {
+                font-size: 0.75rem;
+                color: #888;
+                margin-top: 0.25rem;
+                margin-left: 1.5rem;
+            }
+
+            .document-card-body {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .document-card-item {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .document-card-label {
+                font-size: 0.7rem;
+                color: #888;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .document-card-value {
+                font-size: 0.85rem;
+                color: #b8b8b8;
+            }
+
+            .document-card-feedback {
+                background: rgba(231, 76, 60, 0.1);
+                border-radius: 8px;
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+                border-left: 3px solid #e74c3c;
+            }
+
+            .document-card-feedback-label {
+                font-size: 0.7rem;
+                color: #e74c3c;
+                text-transform: uppercase;
+                margin-bottom: 0.25rem;
+            }
+
+            .document-card-feedback-text {
+                font-size: 0.85rem;
+                color: #e74c3c;
+            }
+
+            .document-card-actions {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+            }
+
+            .document-card-actions .action-btn {
+                flex: 1;
+                min-width: 80px;
+                padding: 0.6rem 0.75rem;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                font-size: 0.85rem;
+                border-radius: 8px;
+                margin: 0;
+            }
+
+            .document-card-actions .action-btn i {
+                font-size: 0.9rem;
+            }
 
             .status {
-                min-width: 80px;
+                padding: 0.25rem 0.6rem;
                 font-size: 0.75rem;
-                padding: 0.2rem 0.6rem;
+                min-width: auto;
             }
 
-            .action-btn {
-                padding: 0.35rem 0.65rem;
-                font-size: 0.85rem;
+            .pre-req-badge {
+                font-size: 0.6rem;
+                padding: 2px 5px;
+                margin-left: 0;
             }
 
+            /* Modal improvements */
             .modal-content {
-                width: 95%;
-                max-width: none;
+                width: 19rem;
+                max-width: 95%;
+                margin: 1rem auto;
+                max-height: 90vh;
+                overflow-y: auto;
             }
 
             .modal-header {
-                padding: 0.75rem 1rem;
+                padding: 1rem;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            .modal-header h3 {
+                font-size: 1rem;
+            }
+
+            .close-modal {
+                font-size: 1.75rem;
+                padding: 0.25rem;
             }
 
             .modal-body {
@@ -382,71 +582,119 @@ $documents = $studentService->getStudentDocuments($userId);
 
             .upload-area i {
                 font-size: 2rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .upload-area p {
+                font-size: 0.9rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .upload-area small {
+                font-size: 0.75rem;
+            }
+
+            .btn-submit {
+                padding: 0.9rem;
+                font-size: 1rem;
+                border-radius: 8px;
+            }
+
+            .viewer-modal-content {
+                width: 100%;
+                height: 100vh;
+                max-width: 100%;
+                border-radius: 0;
+            }
+
+            .viewer-body {
+                height: calc(100vh - 60px);
+            }
+
+            /* Alert messages */
+            [style*="background: rgba(46, 204, 113"],
+            [style*="background: rgba(231, 76, 60"] {
+                font-size: 0.9rem;
+                padding: 0.75rem !important;
             }
         }
 
-        @media (max-width: 480px) {
+        @media (max-width: 400px) {
             .document-container {
-                padding: 0.75rem;
-                width: 19rem;
+                padding: 0.75rem 0.25rem;
+                width: 20rem;
+                max-width: 100%;
             }
 
             h1 {
-                font-size: 1.5rem;
+                font-size: 1.3rem;
             }
 
             .nav-pills {
-                gap: 0.35rem;
+                gap: 0.2rem;
             }
 
             .nav-link {
-                padding: 0.5rem 0.75rem;
-                font-size: 0.8rem;
+                padding: 0.4rem 0.5rem;
+                font-size: 0.7rem;
             }
 
             .search-container input {
-                padding: 0.6rem;
+                padding: 0.6rem 0.8rem;
                 font-size: 0.9rem;
+                width: 17.5rem;
             }
 
-            .documents-table {
-                min-width: 700px;
+            .document-card {
+                padding: 0.75rem;
             }
 
-            .documents-table th,
-            .documents-table td {
-                padding: 0.6rem 0.4rem;
-                font-size: 0.8rem;
+            .document-card-header {
+                flex-direction: column;
+                gap: 0.5rem;
             }
 
-            .document-name {
-                gap: 5px;
+            .document-card-title {
                 font-size: 0.85rem;
+                flex-wrap: wrap;
             }
 
-            .pre-req-badge {
-                font-size: 0.65rem;
-                padding: 1px 4px;
+            .document-card-code {
+                margin-left: 1.25rem;
+                font-size: 0.7rem;
+            }
+
+            .document-card-body {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .document-card-actions {
+                gap: 0.35rem;
+            }
+
+            .document-card-actions .action-btn {
+                padding: 0.5rem 0.5rem;
+                font-size: 0.75rem;
+                min-width: 60px;
+            }
+
+            .document-card-actions .action-btn i {
+                font-size: 0.8rem;
             }
 
             .status {
-                min-width: 70px;
-                font-size: 0.7rem;
-                padding: 0.15rem 0.5rem;
+                font-size: 0.65rem;
+                padding: 0.2rem 0.5rem;
             }
 
-            .action-btn {
-                padding: 0.3rem 0.5rem;
-                font-size: 0.8rem;
-                margin-right: 0.25rem;
+            .pre-req-badge {
+                font-size: 0.55rem;
+                padding: 1px 4px;
             }
 
-            .action-btn i {
-                font-size: 0.85rem;
-            }
-
-            .modal-header h3 {
-                font-size: 1rem;
+            .modal-content {
+                width: 18rem;
             }
 
             .upload-area {
@@ -455,22 +703,101 @@ $documents = $studentService->getStudentDocuments($userId);
 
             .upload-area i {
                 font-size: 1.75rem;
-                margin-bottom: 0.75rem;
-            }
-
-            .upload-area p {
-                font-size: 0.9rem;
             }
 
             .btn-submit {
-                padding: 0.7rem;
+                padding: 0.75rem;
                 font-size: 0.9rem;
             }
+        }
 
-            .viewer-modal-content {
-                width: 100%;
-                height: 95vh;
+        /* DOCX Container Styles */
+        .docx-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: white;
+            padding: 20px;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .docx-container .docx-wrapper {
+            background: #e8e8e8 !important;
+            padding: 15px !important;
+            min-height: auto !important;
+        }
+
+        .docx-container section.docx {
+            margin: 15px auto !important;
+            background: white !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+            max-width: 850px !important;
+        }
+
+        .docx-container .docx-viewer {
+            padding: 25pt 50pt 40pt 58.5pt !important;
+        }
+
+        .docx-container article {
+            margin-top: 7rem !important;
+        }
+
+        .docx-container header.docx {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        .docx-container footer.docx {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .docx-container article.docx {
+            min-height: 100px !important;
+        }
+
+        .docx-container p {
+            margin-top: 0 !important;
+        }
+
+        .docx-container section.docx>*:first-child {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        .docx-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .docx-loading i {
+            margin-right: 0.5rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
             }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .viewer-body {
+            position: relative;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -482,18 +809,18 @@ $documents = $studentService->getStudentDocuments($userId);
             <h1>Document Submission</h1>
 
             <?php if (isset($_SESSION['success_msg'])): ?>
-                <div
-                    style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(46, 204, 113, 0.3);">
-                    <?php echo $_SESSION['success_msg'];
-                    unset($_SESSION['success_msg']); ?>
-                </div>
+                    <div
+                        style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(46, 204, 113, 0.3);">
+                        <?php echo $_SESSION['success_msg'];
+                        unset($_SESSION['success_msg']); ?>
+                    </div>
             <?php endif; ?>
             <?php if (isset($_SESSION['error_msg'])): ?>
-                <div
-                    style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(231, 76, 60, 0.3);">
-                    <?php echo $_SESSION['error_msg'];
-                    unset($_SESSION['error_msg']); ?>
-                </div>
+                    <div
+                        style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(231, 76, 60, 0.3);">
+                        <?php echo $_SESSION['error_msg'];
+                        unset($_SESSION['error_msg']); ?>
+                    </div>
             <?php endif; ?>
 
             <!-- Filters -->
@@ -524,9 +851,9 @@ $documents = $studentService->getStudentDocuments($userId);
                     </thead>
                     <tbody id="documentsTableBody">
                         <?php if (empty($documents)): ?>
-                            <tr>
-                                <td colspan="6" style="text-align:center; color:#888;">No document requirements found.</td>
-                            </tr>
+                                <tr>
+                                    <td colspan="6" style="text-align:center; color:#888;">No document requirements found.</td>
+                                </tr>
                         <?php endif; ?>
 
                         <?php foreach ($documents as $doc):
@@ -534,105 +861,227 @@ $documents = $studentService->getStudentDocuments($userId);
                             $statusClass = 'status-' . strtolower($status);
                             $isPreReq = $doc['is_pre_required'];
                             ?>
-                            <tr data-status="<?php echo strtolower($status); ?>"
-                                data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
-                                <td>
-                                    <div class="document-name">
-                                        <i class="fas fa-file-alt"></i>
-                                        <?php echo htmlspecialchars($doc['name']); ?>
-                                        <?php if ($isPreReq): ?>
-                                            <span class="pre-req-badge"
-                                                title="You must approve this before starting OJT">Required</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div style="font-size:0.8rem; color:#666; margin-left:26px; margin-top:4px;">
-                                        <?php echo htmlspecialchars($doc['code']); ?>
-                                    </div>
-                                </td>
-                                <td style="text-transform: capitalize;">
-                                    <?php echo str_replace('_', ' ', $doc['category']); ?>
-                                </td>
-                                <td>
-                                    <span class="status <?php echo $statusClass; ?>">
-                                        <?php echo ucfirst($status); ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php
-                                    // Check if deadline exists and is valid
-                                    if ($doc['deadline'] && $doc['deadline'] != '0000-00-00' && $doc['deadline'] != '0000-00-00 00:00:00') {
-                                        try {
-                                            $deadline = new DateTime($doc['deadline']);
-                                            $today = new DateTime();
-                                            $daysLeft = $today->diff($deadline)->days;
-                                            $isPast = $today > $deadline;
+                                <tr data-status="<?php echo strtolower($status); ?>"
+                                    data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
+                                    <td>
+                                        <div class="document-name">
+                                            <i class="fas fa-file-alt"></i>
+                                            <?php echo htmlspecialchars($doc['name']); ?>
+                                            <?php if ($isPreReq): ?>
+                                                    <span class="pre-req-badge"
+                                                        title="You must approve this before starting OJT">Required</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div style="font-size:0.8rem; color:#666; margin-left:26px; margin-top:4px;">
+                                            <?php echo htmlspecialchars($doc['code']); ?>
+                                        </div>
+                                    </td>
+                                    <td style="text-transform: capitalize;">
+                                        <?php echo str_replace('_', ' ', $doc['category']); ?>
+                                    </td>
+                                    <td>
+                                        <span class="status <?php echo $statusClass; ?>">
+                                            <?php echo ucfirst($status); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        // Check if deadline exists and is valid
+                                        if ($doc['deadline'] && $doc['deadline'] != '0000-00-00' && $doc['deadline'] != '0000-00-00 00:00:00') {
+                                            try {
+                                                $deadline = new DateTime($doc['deadline']);
+                                                $today = new DateTime();
+                                                $daysLeft = $today->diff($deadline)->days;
+                                                $isPast = $today > $deadline;
 
-                                            echo '<span style="';
-                                            if ($isPast && $status === 'Missing') {
-                                                echo 'color: #e74c3c; font-weight: bold;';
-                                            } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
-                                                echo 'color: #f39c12; font-weight: bold;';
+                                                echo '<span style="';
+                                                if ($isPast && $status === 'Missing') {
+                                                    echo 'color: #e74c3c; font-weight: bold;';
+                                                } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
+                                                    echo 'color: #f39c12; font-weight: bold;';
+                                                }
+                                                echo '">';
+                                                echo date('M d, Y', strtotime($doc['deadline']));
+                                                if ($isPast && $status === 'Missing') {
+                                                    echo ' <i class="fas fa-exclamation-triangle" title="Overdue"></i>';
+                                                } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
+                                                    echo ' (' . $daysLeft . ' days left)';
+                                                }
+                                                echo '</span>';
+                                            } catch (Exception $e) {
+                                                echo '<span style="color: #888;">No deadline</span>';
                                             }
-                                            echo '">';
-                                            echo date('M d, Y', strtotime($doc['deadline']));
-                                            if ($isPast && $status === 'Missing') {
-                                                echo ' <i class="fas fa-exclamation-triangle" title="Overdue"></i>';
-                                            } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
-                                                echo ' (' . $daysLeft . ' days left)';
-                                            }
-                                            echo '</span>';
-                                        } catch (Exception $e) {
+                                        } else {
                                             echo '<span style="color: #888;">No deadline</span>';
                                         }
-                                    } else {
-                                        echo '<span style="color: #888;">No deadline</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <td>
-                                    <?php if ($doc['feedback']): ?>
-                                        <span style="color: #e74c3c; font-size: 0.9rem;"><i class="fas fa-comment-alt"></i>
-                                            <?php echo htmlspecialchars($doc['feedback']); ?></span>
-                                    <?php else: ?>
-                                        <span style="color: #666;">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <!-- Actions -->
-                                    <div style="display:flex;">
-
-                                        <!-- Download Template if available -->
-                                        <?php if ($doc['template_path']): ?>
-                                            <a href="<?php echo htmlspecialchars($doc['template_path']); ?>"
-                                                class="action-btn download" title="Download Template" download target="_blank">
-                                                <i class="fas fa-file-download"></i>
-                                            </a>
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($doc['feedback']): ?>
+                                                <span style="color: #e74c3c; font-size: 0.9rem;"><i class="fas fa-comment-alt"></i>
+                                                    <?php echo htmlspecialchars($doc['feedback']); ?></span>
+                                        <?php else: ?>
+                                                <span style="color: #666;">-</span>
                                         <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <!-- Actions -->
+                                        <div style="display:flex;">
 
-                                        <!-- View Submission if exists -->
-                                        <?php if ($doc['file_path']): ?>
-                                            <button class="action-btn view"
-                                                onclick="viewDocument('<?php echo htmlspecialchars($doc['file_path']); ?>', '<?php echo htmlspecialchars($doc['name']); ?>')"
-                                                title="View Submission">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        <?php endif; ?>
+                                            <!-- Download Template if available -->
+                                            <?php if ($doc['template_path']): ?>
+                                                    <a href="<?php echo htmlspecialchars($doc['template_path']); ?>"
+                                                        class="action-btn download" title="Download Template" download target="_blank">
+                                                        <i class="fas fa-file-download"></i>
+                                                    </a>
+                                            <?php endif; ?>
 
-                                        <!-- Upload button (if missing, revised, or rejected) -->
-                                        <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
-                                            <button class="action-btn upload"
-                                                onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?>')"
-                                                title="Upload Document">
-                                                <i class="fas fa-upload"></i>
-                                            </button>
-                                        <?php endif; ?>
+                                            <!-- View Submission if exists -->
+                                            <?php if ($doc['file_path']): ?>
+                                                    <button class="action-btn view"
+                                                        onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)"
+                                                        title="View Submission">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                            <?php endif; ?>
 
-                                    </div>
-                                </td>
-                            </tr>
+                                            <!-- Upload button (if missing, revised, or rejected) -->
+                                            <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
+                                                    <button class="action-btn upload"
+                                                        onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)"
+                                                        title="Upload Document">
+                                                        <i class="fas fa-upload"></i>
+                                                    </button>
+                                            <?php endif; ?>
+
+                                            <!-- Reupload button (if document has been submitted and is pending or approved) -->
+                                            <?php if ($doc['file_path'] && in_array($doc['status'], ['pending', 'approved'])): ?>
+                                                    <button class="action-btn reupload"
+                                                        onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)"
+                                                        title="Reupload Document">
+                                                        <i class="fas fa-redo-alt"></i>
+                                                    </button>
+                                            <?php endif; ?>
+
+                                        </div>
+                                    </td>
+                                </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            <!-- Mobile Card Layout -->
+            <div class="document-cards-container" id="documentCardsContainer">
+                <?php if (empty($documents)): ?>
+                        <div style="text-align:center; color:#888; padding: 2rem;">No document requirements found.</div>
+                <?php endif; ?>
+
+                <?php foreach ($documents as $doc):
+                    $status = $doc['status'] ?: 'Missing';
+                    $statusClass = 'status-' . strtolower($status);
+                    $isPreReq = $doc['is_pre_required'];
+
+                    // Calculate deadline info
+                    $deadlineDisplay = 'No deadline';
+                    $deadlineStyle = 'color: #888;';
+                    if ($doc['deadline'] && $doc['deadline'] != '0000-00-00' && $doc['deadline'] != '0000-00-00 00:00:00') {
+                        try {
+                            $deadline = new DateTime($doc['deadline']);
+                            $today = new DateTime();
+                            $daysLeft = $today->diff($deadline)->days;
+                            $isPast = $today > $deadline;
+
+                            $deadlineDisplay = date('M d, Y', strtotime($doc['deadline']));
+                            if ($isPast && $status === 'Missing') {
+                                $deadlineStyle = 'color: #e74c3c; font-weight: bold;';
+                                $deadlineDisplay .= ' (Overdue)';
+                            } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
+                                $deadlineStyle = 'color: #f39c12; font-weight: bold;';
+                                $deadlineDisplay .= ' (' . $daysLeft . ' days left)';
+                            }
+                        } catch (Exception $e) {
+                            $deadlineDisplay = 'No deadline';
+                        }
+                    }
+                    ?>
+                        <div class="document-card" data-status="<?php echo strtolower($status); ?>"
+                            data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
+
+                            <!-- Card Header -->
+                            <div class="document-card-header">
+                                <div>
+                                    <div class="document-card-title">
+                                        <i class="fas fa-file-alt"></i>
+                                        <?php echo htmlspecialchars($doc['name']); ?>
+                                        <?php if ($isPreReq): ?>
+                                                <span class="pre-req-badge">Required</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="document-card-code"><?php echo htmlspecialchars($doc['code']); ?></div>
+                                </div>
+                                <span class="status <?php echo $statusClass; ?>"><?php echo ucfirst($status); ?></span>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="document-card-body">
+                                <div class="document-card-item">
+                                    <span class="document-card-label">Category</span>
+                                    <span class="document-card-value" style="text-transform: capitalize;">
+                                        <?php echo str_replace('_', ' ', $doc['category']); ?>
+                                    </span>
+                                </div>
+                                <div class="document-card-item">
+                                    <span class="document-card-label">Deadline</span>
+                                    <span class="document-card-value" style="<?php echo $deadlineStyle; ?>">
+                                        <?php echo $deadlineDisplay; ?>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Feedback (if any) -->
+                            <?php if ($doc['feedback']): ?>
+                                    <div class="document-card-feedback">
+                                        <div class="document-card-feedback-label">
+                                            <i class="fas fa-comment-alt"></i> Feedback
+                                        </div>
+                                        <div class="document-card-feedback-text">
+                                            <?php echo htmlspecialchars($doc['feedback']); ?>
+                                        </div>
+                                    </div>
+                            <?php endif; ?>
+
+                            <!-- Card Actions -->
+                            <div class="document-card-actions">
+                                <?php if ($doc['template_path']): ?>
+                                        <a href="<?php echo htmlspecialchars($doc['template_path']); ?>" class="action-btn download"
+                                            download target="_blank">
+                                            <i class="fas fa-file-download"></i> Template
+                                        </a>
+                                <?php endif; ?>
+
+                                <?php if ($doc['file_path']): ?>
+                                        <button class="action-btn view"
+                                            onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                <?php endif; ?>
+
+                                <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
+                                        <button class="action-btn upload"
+                                            onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)">
+                                            <i class="fas fa-upload"></i> Upload
+                                        </button>
+                                <?php endif; ?>
+
+                                <?php if ($doc['file_path'] && in_array($doc['status'], ['pending', 'approved'])): ?>
+                                        <button class="action-btn reupload"
+                                            onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)">
+                                            <i class="fas fa-redo-alt"></i> Reupload
+                                        </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </main>
@@ -641,7 +1090,7 @@ $documents = $studentService->getStudentDocuments($userId);
     <div id="uploadModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Upload Document</h3>
+                <h3 id="uploadModalTitle">Upload Document</h3>
                 <span class="close-modal" onclick="closeModal('uploadModal')">&times;</span>
             </div>
             <div class="modal-body">
@@ -683,6 +1132,7 @@ $documents = $studentService->getStudentDocuments($userId);
             </div>
             <div class="modal-body viewer-body">
                 <iframe id="viewFrame" class="viewer-frame" src=""></iframe>
+                <div id="docxContainer" class="docx-container" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -692,25 +1142,110 @@ $documents = $studentService->getStudentDocuments($userId);
         const uploadModal = document.getElementById('uploadModal');
         const viewModal = document.getElementById('viewModal');
 
-        function openUploadModal(id, name) {
+        function openUploadModal(id, name, isReupload = false) {
             document.getElementById('uploadDocTypeId').value = id;
             document.getElementById('uploadDocName').textContent = name;
             document.getElementById('fileNameDisplay').textContent = '';
             document.getElementById('docFile').value = '';
+
+            // Update modal title and button text based on whether it's a reupload
+            const modalTitle = document.getElementById('uploadModalTitle');
+            const submitBtn = document.querySelector('#uploadModal .btn-submit');
+
+            if (isReupload) {
+                modalTitle.textContent = 'Reupload Document';
+                submitBtn.textContent = 'Submit New Version';
+                submitBtn.style.background = '#9b59b6';
+            } else {
+                modalTitle.textContent = 'Upload Document';
+                submitBtn.textContent = 'Submit Document';
+                submitBtn.style.background = 'var(--accent-clr)';
+            }
+
             uploadModal.style.display = 'flex';
         }
 
         function viewDocument(url, title) {
+            const viewFrame = document.getElementById('viewFrame');
+            const docxContainer = document.getElementById('docxContainer');
+
             document.getElementById('viewDocTitle').textContent = title || 'Document Preview';
-            document.getElementById('viewFrame').src = url;
             document.getElementById('viewDownloadBtn').href = url;
+
+            // Check if it's a DOCX file
+            const lowerUrl = url.toLowerCase();
+            const isDocx = lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc');
+
+            if (isDocx && docxContainer && typeof docx !== 'undefined') {
+                // Show DOCX container, hide iframe
+                viewFrame.style.display = 'none';
+                docxContainer.style.display = 'block';
+                docxContainer.innerHTML = '<div class="docx-loading"><i class="fas fa-spinner"></i> Loading document...</div>';
+
+                // Fetch and render DOCX
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to load document');
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        docxContainer.innerHTML = '';
+                        return docx.renderAsync(blob, docxContainer, null, {
+                            className: 'docx-viewer',
+                            inWrapper: true,
+                            ignoreWidth: false,
+                            ignoreHeight: false,
+                            ignoreFonts: true,
+                            breakPages: true,
+                            ignoreLastRenderedPageBreak: true,
+                            useBase64URL: true,
+                            renderHeaders: true,
+                            renderFooters: true,
+                            renderFootnotes: true,
+                            renderEndnotes: true
+                        });
+                    })
+                    .catch(err => {
+                        console.error('DOCX render error:', err);
+                        docxContainer.innerHTML = `
+                            <div style="text-align: center; padding: 40px; color: #666;">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem; color: #f39c12;"></i>
+                                <p style="margin-bottom: 1rem;">Unable to preview this document in the browser.</p>
+                                <p style="font-size: 0.9rem;">Please use the <strong>Download</strong> button to view the file.</p>
+                            </div>
+                        `;
+                    });
+            } else {
+                // Show iframe, hide DOCX container (for PDF, images, etc.)
+                if (docxContainer) {
+                    docxContainer.style.display = 'none';
+                    docxContainer.innerHTML = '';
+                }
+                viewFrame.style.display = 'block';
+                viewFrame.src = url;
+            }
+
             viewModal.style.display = 'flex';
         }
 
         function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
+            const modal = document.getElementById(id);
+
+            // Blur any focused element inside the modal before hiding
+            const focusedElement = modal.querySelector(':focus');
+            if (focusedElement) {
+                focusedElement.blur();
+            }
+
+            modal.style.display = 'none';
+
             if (id === 'viewModal') {
                 document.getElementById('viewFrame').src = '';
+                const docxContainer = document.getElementById('docxContainer');
+                if (docxContainer) {
+                    docxContainer.innerHTML = '';
+                    docxContainer.style.display = 'none';
+                }
             }
         }
 
@@ -726,9 +1261,20 @@ $documents = $studentService->getStudentDocuments($userId);
         // Close on click outside
         window.onclick = function (e) {
             if (e.target.classList.contains('modal')) {
+                // Blur any focused element before hiding
+                const focusedElement = e.target.querySelector(':focus');
+                if (focusedElement) {
+                    focusedElement.blur();
+                }
+
                 e.target.style.display = 'none';
                 if (e.target.id === 'viewModal') {
                     document.getElementById('viewFrame').src = '';
+                    const docxContainer = document.getElementById('docxContainer');
+                    if (docxContainer) {
+                        docxContainer.innerHTML = '';
+                        docxContainer.style.display = 'none';
+                    }
                 }
             }
         };
@@ -737,12 +1283,14 @@ $documents = $studentService->getStudentDocuments($userId);
         const searchInput = document.getElementById('searchInput');
         const navLinks = document.querySelectorAll('.nav-link');
         const rows = document.querySelectorAll('#documentsTableBody tr');
+        const cards = document.querySelectorAll('.document-card');
 
         function filterDocs() {
             const query = searchInput.value.toLowerCase();
             const activeLink = document.querySelector('.nav-link.active');
             const filterType = activeLink.getAttribute('data-filter');
 
+            // Filter table rows
             rows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 const status = row.getAttribute('data-status'); // pending, approved, missing, etc
@@ -753,14 +1301,28 @@ $documents = $studentService->getStudentDocuments($userId);
                 else if (filterType === 'pre_required') matchesFilter = isPreReq;
                 else matchesFilter = (status === filterType);
 
-                // Handling 'missing' status if filter is 'pending' ? No, stick to exact match usually. 
-                // But for 'pending' maybe we want things that are waiting for approval?
-                // Our DB status: 'pending', 'approved', 'revise', 'rejected'. 'missing' is virtual.
-
                 if (matchesFilter && text.includes(query)) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
+                }
+            });
+
+            // Filter mobile cards
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                const status = card.getAttribute('data-status');
+                const isPreReq = card.getAttribute('data-prereq') === 'true';
+
+                let matchesFilter = false;
+                if (filterType === 'all') matchesFilter = true;
+                else if (filterType === 'pre_required') matchesFilter = isPreReq;
+                else matchesFilter = (status === filterType);
+
+                if (matchesFilter && text.includes(query)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
                 }
             });
         }

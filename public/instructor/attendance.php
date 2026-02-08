@@ -623,6 +623,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 });
         }
 
+        // Format time from 24-hour (military) to 12-hour AM/PM format
+        function formatTime(timeStr) {
+            if (!timeStr) return '-';
+
+            // Handle both "HH:MM:SS" and "YYYY-MM-DD HH:MM:SS" formats
+            const timePart = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
+            const [hours, minutes] = timePart.split(':');
+
+            let hour = parseInt(hours, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12; // Convert 0 to 12 for midnight
+
+            return `${hour}:${minutes} ${ampm}`;
+        }
+
         function renderAttendanceTable(records) {
             const tbody = document.getElementById('attendanceTableBody');
             const emptyState = document.querySelector('.empty-state');
@@ -637,7 +652,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             tbody.innerHTML = records.map(record => {
                 const profilePic = record.profile_pic_path || '../../storage/images/default_profile.jpg';
-                const timeOut = record.time_out || '-';
+                const timeIn = formatTime(record.time_in);
+                const timeOut = record.time_out ? formatTime(record.time_out) : '-';
                 const hours = record.hours ? parseFloat(record.hours).toFixed(2) : '-';
                 const statusClass = `status-${record.status}`;
                 const workplace = record.workplace || 'Not assigned';
@@ -657,7 +673,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <td>${workplace}</td>
                         <td>${record.date}</td>
                         <td style="text-transform: capitalize;">${record.block_type}</td>
-                        <td>${record.time_in}</td>
+                        <td>${timeIn}</td>
                         <td>${timeOut}</td>
                         <td>${hours}</td>
                         <td><span class="status ${statusClass}">${record.status}</span></td>
@@ -677,14 +693,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             const modalDetails = document.getElementById('imageDetails');
 
             const imagePath = record.photo_path || '../images/no-image.png';
-            const timeOut = record.time_out || 'Still ongoing';
+            const timeIn = formatTime(record.time_in);
+            const timeOut = record.time_out ? formatTime(record.time_out) : 'Still ongoing';
 
             modal.style.display = 'block';
             modalImg.src = imagePath;
             modalDetails.innerHTML = `
                 <strong>${record.full_name}</strong> (${record.school_id})<br>
                 ${record.date} • ${record.block_type}<br>
-                Time In: ${record.time_in} | Time Out: ${timeOut}<br>
+                Time In: ${timeIn} | Time Out: ${timeOut}<br>
                 Status: ${record.status}
             `;
             document.body.style.overflow = 'hidden';

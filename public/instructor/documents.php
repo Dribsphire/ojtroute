@@ -107,6 +107,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $documentTypes = $instructorService->getAllDocumentTypes($instructorId);
 $submissions = $instructorService->getStudentSubmissions($instructorId);
 
+// Sort submissions by status priority: pending -> revise -> rejected -> approved
+$statusPriority = [
+    'pending' => 1,
+    'revise' => 2,
+    'rejected' => 3,
+    'approved' => 4
+];
+
+usort($submissions, function ($a, $b) use ($statusPriority) {
+    $priorityA = $statusPriority[strtolower($a['status'] ?? '')] ?? 5;
+    $priorityB = $statusPriority[strtolower($b['status'] ?? '')] ?? 5;
+    return $priorityA - $priorityB;
+});
+
 // Group document types
 $preRequiredDocs = array_filter($documentTypes, function ($d) {
     return $d['is_pre_required'];
@@ -127,6 +141,9 @@ $otherDocs = array_filter($documentTypes, function ($d) {
     <link rel="icon" type="image/png" href="../images/CHMSU.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../css/instructor_style.css">
+    <!-- DOCX Preview Libraries (JSZip is required dependency) -->
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/docx-preview@0.1.20/dist/docx-preview.min.js"></script>
     <style>
         .page-header {
             display: flex;
@@ -393,8 +410,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
         }
 
         .doc-modal-content {
-            width: min(1000px, 95vw);
-            height: min(90vh, 800px);
+            width: min(1400px, 95vw);
+            height: min(92vh, 900px);
             background: var(--base-clr);
             border: 1px solid var(--line-clr);
             border-radius: 1em;
@@ -427,7 +444,12 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
         .doc-modal-body {
             flex: 1;
-            background: var(--hover-clr);
+            background: #2a2a3a;
+            overflow: auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .doc-frame {
@@ -436,6 +458,139 @@ $otherDocs = array_filter($documentTypes, function ($d) {
             border: 0;
             display: block;
             background: white;
+            object-fit: contain;
+        }
+
+        /* Image preview container - letter size document style */
+        .image-preview-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: #e8e8e8;
+            padding: 20px;
+            box-sizing: border-box;
+            display: none;
+        }
+
+        .image-document-wrapper {
+            width: 612px;
+            /* Letter width at 72 DPI */
+            min-height: 792px;
+            /* Letter height at 72 DPI */
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-document-wrapper img {
+            max-width: 100%;
+            max-height: 700px;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Image container for proper scaling */
+        .doc-modal-body img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .docx-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: white;
+            padding: 20px;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .docx-container .docx-wrapper {
+            background: #e8e8e8 !important;
+            padding: 15px !important;
+            min-height: auto !important;
+        }
+
+        .docx-container section.docx {
+            margin: 15px auto !important;
+            background: white !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+            max-width: 850px !important;
+        }
+
+        /* Specific padding for docx-viewer */
+        .docx-container .docx-viewer {
+            padding: 25pt 50pt 40pt 58.5pt !important;
+        }
+
+        article {
+            margin-top: 7rem !important;
+        }
+
+        /* Remove extra space in headers */
+        .docx-container header.docx {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        /* Remove extra space in footers */
+        .docx-container footer.docx {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        /* Main content styling with margin-top */
+        .docx-container article.docx {
+            min-height: 100px !important;
+            margin-top: 7rem !important;
+        }
+
+        /* Fix paragraph spacing */
+        .docx-container p {
+            margin-top: 0 !important;
+        }
+
+        /* First element in section should have no top margin */
+        .docx-container section.docx>*:first-child {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        .docx-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .docx-loading i {
+            margin-right: 0.5rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .upload-modal {
@@ -659,6 +814,28 @@ $otherDocs = array_filter($documentTypes, function ($d) {
             color: rgba(255, 255, 255, 0.6);
             font-style: italic;
         }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Fix date input calendar icon visibility on dark theme */
+        input[type="date"] {
+            color-scheme: dark;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -694,8 +871,9 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
         <div class="table-tools">
             <div class="search-box">
+                <label for="submissionSearch" class="visually-hidden">Search submissions</label>
                 <i class="fas fa-search"></i>
-                <input id="submissionSearch" type="text"
+                <input id="submissionSearch" name="submissionSearch" type="text" autocomplete="off"
                     placeholder="Search student, section, document type, status...">
             </div>
             <button id="bulkApproveBtn" class="btn primary" type="button">
@@ -732,8 +910,9 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             </div>
                         </div>
                         <div style="display:flex; gap:0.5rem;">
-                            <button class="btn" onclick="deleteDocument(<?php echo $doc['id']; ?>, '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?>')"
-                                    title=" Delete Document">
+                            <button class="btn"
+                                onclick="deleteDocument(<?php echo $doc['id']; ?>, '<?php echo htmlspecialchars($doc['name'], ENT_QUOTES); ?>')"
+                                title=" Delete Document">
                                 <i class="fas fa-trash"></i>
                             </button>
                             <?php if ($doc['template_path']): ?>
@@ -807,7 +986,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     <thead>
                         <tr>
                             <th class="col-check">
-                                <input id="selectAll" type="checkbox" />
+                                <label for="selectAll" class="visually-hidden">Select all</label>
+                                <input id="selectAll" name="selectAll" type="checkbox" />
                             </th>
                             <th>Student Name</th>
                             <th>Document Type</th>
@@ -829,7 +1009,10 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             <tr data-submission-id="<?php echo $row['id']; ?>"
                                 data-file="<?php echo htmlspecialchars($row['file_path']); ?>">
                                 <td class="col-check">
-                                    <input class="row-check" type="checkbox" />
+                                    <label for="rowCheck<?php echo $row['id']; ?>" class="visually-hidden">Select submission
+                                        <?php echo $row['id']; ?></label>
+                                    <input id="rowCheck<?php echo $row['id']; ?>" name="rowCheck<?php echo $row['id']; ?>"
+                                        class="row-check" type="checkbox" />
                                 </td>
                                 <td>
                                     <?php
@@ -912,6 +1095,12 @@ $otherDocs = array_filter($documentTypes, function ($d) {
             </div>
             <div class="doc-modal-body">
                 <iframe id="docFrame" class="doc-frame" src="" title="Document Preview"></iframe>
+                <div id="docxContainer" class="docx-container" style="display: none;"></div>
+                <div id="imagePreviewContainer" class="image-preview-container">
+                    <div class="image-document-wrapper">
+                        <img id="imagePreview" src="" alt="Document Preview">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -927,7 +1116,7 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                 </div>
             </div>
             <form method="POST" enctype="multipart/form-data" action="documents.php">
-                <input type="hidden" name="action" value="upload_template">
+                <input type="hidden" id="uploadAction" name="action" value="upload_template">
                 <input type="hidden" id="uploadDocTypeId" name="document_type_id" value="">
 
                 <div class="upload-modal-body">
@@ -967,29 +1156,31 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                 </div>
             </div>
             <form method="POST" enctype="multipart/form-data" action="documents.php">
-                <input type="hidden" name="action" value="create_document">
+                <input type="hidden" id="createDocAction" name="action" value="create_document">
 
                 <div class="upload-modal-body">
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="docName"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Document
                             Name</label>
-                        <input type="text" name="name" required placeholder="e.g. Weekly Report 1"
+                        <input type="text" id="docName" name="name" required placeholder="e.g. Weekly Report 1"
+                            autocomplete="off"
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="docCode"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Document
                             Code</label>
-                        <input type="text" name="code" required placeholder="e.g. WEEKLY_1"
+                        <input type="text" id="docCode" name="code" required placeholder="e.g. WEEKLY_1"
+                            autocomplete="off"
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="docCategory"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Category</label>
-                        <select name="category" required
+                        <select id="docCategory" name="category" required
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                             <option value="other">Other (Post-OJT)</option>
                             <option value="pre_required">Pre-Required (Blocks Attendance)</option>
@@ -1000,10 +1191,10 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="docDeadline"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Submission
                             Deadline (Optional)</label>
-                        <input type="date" name="deadline" placeholder="Select deadline date"
+                        <input type="date" id="docDeadline" name="deadline" placeholder="Select deadline date"
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
                         <small
                             style="display:block; margin-top:0.3rem; color: rgba(255,255,255,0.6); font-size:0.85rem;">Students
@@ -1011,7 +1202,7 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 0.5rem;">
-                        <label
+                        <label for="createTemplateFile"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Template
                             File</label>
                         <div class="upload-area" style="padding: 1.5rem;"
@@ -1048,12 +1239,12 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                 </div>
             </div>
             <form method="POST" action="documents.php">
-                <input type="hidden" name="action" value="update_status">
+                <input type="hidden" id="approvalAction" name="action" value="update_status">
                 <input type="hidden" id="approvalSubId" name="submission_id" value="">
 
                 <div class="upload-modal-body">
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="approvalStatus"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Status</label>
                         <select id="approvalStatus" name="status" required
                             style="width: 100%; padding: 0.6rem 0.8rem; border-radius: .5em; border: 1px solid var(--line-clr); background: var(--base-clr); color: var(--text-clr); outline: none;">
@@ -1065,7 +1256,7 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label
+                        <label for="approvalFeedback"
                             style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">Feedback</label>
                         <textarea id="approvalFeedback" name="feedback" rows="4"
                             placeholder="Enter feedback for the student..."
@@ -1073,7 +1264,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
+                        <label for="approvalPoints"
+                            style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
                             Bonus Points (Optional)
                             <i class="fas fa-info-circle" title="Award bonus points for exceptional work"
                                 style="font-size: 0.8rem; opacity: 0.7; margin-left: 4px;"></i>
@@ -1088,7 +1280,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
+                        <label for="approvalAccuracyQualityPoints"
+                            style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
                             Accuracy & Quality Points (Optional)
                             <i class="fas fa-info-circle" title="Award points for accuracy and quality of content"
                                 style="font-size: 0.8rem; opacity: 0.7; margin-left: 4px;"></i>
@@ -1103,7 +1296,8 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     </div>
 
                     <div style="margin-bottom: 1rem;">
-                        <label style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
+                        <label for="approvalProfessionalPresentationPoints"
+                            style="display:block; color:var(--text-clr); margin-bottom:0.4rem; font-size:0.9rem;">
                             Professional Presentation Points (Optional)
                             <i class="fas fa-info-circle"
                                 title="Award points for professional formatting and presentation"
@@ -1129,13 +1323,13 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
     <!-- Bulk Approval Form -->
     <form id="bulkApproveForm" method="POST" action="documents.php" style="display:none;">
-        <input type="hidden" name="action" value="bulk_approve">
+        <input type="hidden" id="bulkApproveAction" name="action" value="bulk_approve">
         <input type="hidden" id="bulkApprovedIds" name="submission_ids" value="">
     </form>
 
     <!-- Delete Document Form -->
     <form id="deleteDocumentForm" method="POST" action="documents.php" style="display:none;">
-        <input type="hidden" name="action" value="delete_document">
+        <input type="hidden" id="deleteDocAction" name="action" value="delete_document">
         <input type="hidden" id="deleteDocumentId" name="document_id" value="">
     </form>
 
@@ -1216,40 +1410,122 @@ $otherDocs = array_filter($documentTypes, function ($d) {
             const tbody = table ? table.querySelector('tbody') : null;
             const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
 
-            // Debugging Logs
-            console.log('Script initialized');
-            console.log('Submissions Table:', table);
-            console.log('TBody:', tbody);
-            console.log('Toggle Button:', document.getElementById('toggleUploadedFiles'));
-
-            if (!tbody) {
-                console.warn('Submissions table body not found. Submission features disabled.');
-            }
             const docModal = document.getElementById('docModal');
             const docFrame = document.getElementById('docFrame');
             const docCloseBtn = document.getElementById('docCloseBtn');
             const docDownloadBtn = document.getElementById('docDownloadBtn');
+            const docxContainer = document.getElementById('docxContainer');
+            const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+            const imagePreview = document.getElementById('imagePreview');
 
 
 
             // Global scope for view button
             window.openDocModal = function (fileUrl, title) {
-                if (!docModal || !docFrame || !docDownloadBtn) return;
-                docFrame.src = fileUrl;
+                if (!docModal || !docDownloadBtn) return;
+
                 docDownloadBtn.href = fileUrl;
                 if (title) {
                     const titleEl = document.getElementById('docModalTitle');
                     if (titleEl) titleEl.textContent = title;
                 }
+
+                // Check file extension
+                const lowerUrl = fileUrl.toLowerCase();
+                const isDocx = lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc');
+                const isImage = lowerUrl.endsWith('.png') || lowerUrl.endsWith('.jpg') || 
+                               lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.gif') || 
+                               lowerUrl.endsWith('.webp');
+
+                // Hide all preview containers first
+                if (docFrame) docFrame.style.display = 'none';
+                if (docxContainer) {
+                    docxContainer.style.display = 'none';
+                    docxContainer.innerHTML = '';
+                }
+                if (imagePreviewContainer) imagePreviewContainer.style.display = 'none';
+                if (imagePreview) imagePreview.src = '';
+
+                if (isDocx && docxContainer && typeof docx !== 'undefined') {
+                    // Show DOCX container
+                    docxContainer.style.display = 'block';
+                    docxContainer.innerHTML = '<div class="docx-loading"><i class="fas fa-spinner"></i> Loading document...</div>';
+
+                    // Fetch and render DOCX
+                    fetch(fileUrl)
+                        .then(response => {
+                            if (!response.ok) throw new Error('Failed to load document');
+                            return response.blob();
+                        })
+                        .then(blob => {
+                            docxContainer.innerHTML = '';
+                            return docx.renderAsync(blob, docxContainer, null, {
+                                className: 'docx-viewer',
+                                inWrapper: true,
+                                ignoreWidth: false,
+                                ignoreHeight: false,
+                                ignoreFonts: true,  // Use system fonts to avoid CSP issues
+                                breakPages: true,
+                                ignoreLastRenderedPageBreak: true,
+                                useBase64URL: true,  // Use data: URLs for images (allowed by CSP, unlike blob:)
+                                renderHeaders: true,
+                                renderFooters: true,
+                                renderFootnotes: true,
+                                renderEndnotes: true
+                            });
+                        })
+                        .catch(err => {
+                            console.error('DOCX render error:', err);
+                            docxContainer.innerHTML = `
+                                <div style="text-align: center; padding: 40px; color: #666;">
+                                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem; color: #f39c12;"></i>
+                                    <p style="margin-bottom: 1rem;">Unable to preview this document in the browser.</p>
+                                    <p style="font-size: 0.9rem;">Please use the <strong>Download</strong> button to view the file.</p>
+                                </div>
+                            `;
+                        });
+                } else if (isImage && imagePreviewContainer && imagePreview) {
+                    // Show image in letter-document-sized container
+                    imagePreviewContainer.style.display = 'block';
+                    imagePreview.src = fileUrl;
+                } else {
+                    // Show iframe for PDF and other files
+                    if (docFrame) {
+                        docFrame.style.display = 'block';
+                        docFrame.src = fileUrl;
+                    }
+                }
+
                 docModal.classList.add('open');
                 docModal.setAttribute('aria-hidden', 'false');
             };
 
             function closeDocModal() {
-                if (!docModal || !docFrame) return;
+                if (!docModal) return;
+
+                // Blur any focused element inside the modal before hiding
+                const focusedElement = docModal.querySelector(':focus');
+                if (focusedElement) {
+                    focusedElement.blur();
+                }
+
                 docModal.classList.remove('open');
                 docModal.setAttribute('aria-hidden', 'true');
-                docFrame.src = '';
+
+                // Clear all preview containers
+                if (docFrame) {
+                    docFrame.src = '';
+                }
+                if (docxContainer) {
+                    docxContainer.innerHTML = '';
+                    docxContainer.style.display = 'none';
+                }
+                if (imagePreviewContainer) {
+                    imagePreviewContainer.style.display = 'none';
+                }
+                if (imagePreview) {
+                    imagePreview.src = '';
+                }
             }
 
             if (docCloseBtn) {

@@ -332,13 +332,16 @@ class StudentService
     /**
      * Submit workplace change request
      * 
-     * @param int $studentId Student ID
+     * @param int $userId User ID
      * @param array $workplaceData Workplace information
      * @return bool Success status
      */
-    public function submitWorkplaceChangeRequest($studentId, $workplaceData)
+    public function submitWorkplaceChangeRequest($userId, $workplaceData)
     {
         try {
+            // Note: workplace_change_requests table links to users table via student_id column
+            // based on the foreign key constraint observed in logs.
+
             $stmt = $this->db->prepare("
                 INSERT INTO workplace_change_requests (
                     student_id, 
@@ -376,7 +379,7 @@ class StudentService
             ");
 
             return $stmt->execute([
-                ':student_id' => $studentId,
+                ':student_id' => $userId,
                 ':workplace_name' => $workplaceData['workplace_name'],
                 ':workplace_address' => $workplaceData['workplace_address'],
                 ':position_title' => $workplaceData['position'] ?? '',
@@ -753,6 +756,12 @@ class StudentService
     }
     public function recordAttendance($studentId, $blockType, $lat, $lng, $photoData)
     {
+        // Set timezone to Philippine Time (Asia/Manila, UTC+8)
+        $phpTimezone = new \DateTimeZone('Asia/Manila');
+        $now = new \DateTime('now', $phpTimezone);
+        $currentDate = $now->format('Y-m-d');
+        $currentTime = $now->format('Y-m-d H:i:s');
+
         // 1. Get Student Workplace Coords
         $stmt = $this->db->prepare("
             SELECT workplace_latitude, workplace_longitude 
@@ -798,21 +807,23 @@ class StudentService
         if (!is_dir($dir))
             mkdir($dir, 0755, true);
 
-        $filename = 'att_' . $studentId . '_' . date('Ymd_His') . '.' . $type;
+        $filename = 'att_' . $studentId . '_' . $now->format('Ymd_His') . '.' . $type;
         file_put_contents($dir . $filename, $data);
         $photoPath = '../../storage/uploads/attendance_images/' . $filename;
 
-        // 4. Insert Record
+        // 4. Insert Record with explicit Philippine timezone values
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO attendance_records 
                 (student_id, attendance_date, block_type, time_in, time_in_latitude, time_in_longitude, within_radius, photo_path, status)
                 VALUES 
-                (:sid, CURDATE(), :block, NOW(), :lat, :lng, :wr, :path, 'ongoing')
+                (:sid, :date, :block, :time_in, :lat, :lng, :wr, :path, 'ongoing')
             ");
             $stmt->execute([
                 ':sid' => $studentId,
+                ':date' => $currentDate,
                 ':block' => $blockType,
+                ':time_in' => $currentTime,
                 ':lat' => $lat,
                 ':lng' => $lng,
                 ':wr' => $withinRadius,
@@ -898,15 +909,18 @@ class StudentService
             }
 
             // 3. CRITICAL FIX: Calculate hours with maximum cap to prevent overflow
+            // Use explicit Philippine timezone for time_out
+            $timeOutValue = $currentDateTime->format('Y-m-d H:i:s');
+
             // Update attendance record with time_out and calculate hours using MySQL
             $stmt = $this->db->prepare("
                 UPDATE attendance_records 
-                SET time_out = NOW(), 
+                SET time_out = ?, 
                     status = 'completed',
-                    hours = LEAST(TIMESTAMPDIFF(SECOND, time_in, NOW()) / 3600, 12.0)
+                    hours = LEAST(TIMESTAMPDIFF(SECOND, time_in, ?) / 3600, 12.0)
                 WHERE id = ?
             ");
-            $stmt->execute([$record['id']]);
+            $stmt->execute([$timeOutValue, $timeOutValue, $record['id']]);
 
             // Get the calculated hours from the database
             $stmt = $this->db->prepare("
