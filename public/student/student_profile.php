@@ -96,6 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 if ($hasWorkplace) {
+                    // Check for existing pending request
+                    if ($studentService->hasPendingWorkplaceRequest($student_id)) {
+                        $response['error'] = 'You already have a pending workplace change request. Please wait for your instructor to approve or reject it before submitting a new one.';
+                        break;
+                    }
+
                     // Requesting a change
                     $changeReason = $_POST['change_reason'] ?? '';
                     if (empty($changeReason)) {
@@ -202,6 +208,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $response['error'] = $result['message'] ?? 'Failed to change password';
                 }
                 break;
+
+            case 'update_schedule':
+                $startTime = $_POST['schedule_start_time'] ?? '';
+                $endTime = $_POST['schedule_end_time'] ?? '';
+
+                if (empty($startTime) || empty($endTime)) {
+                    $response['error'] = 'Both start and end times are required';
+                    break;
+                }
+
+                $result = $studentService->updateStudentSchedule($student_id, $startTime, $endTime);
+                if ($result['success']) {
+                    $response['success'] = true;
+                    $response['message'] = $result['message'];
+                } else {
+                    $response['error'] = $result['message'];
+                }
+                break;
         }
     } catch (Exception $e) {
         $response['error'] = 'An error occurred: ' . $e->getMessage();
@@ -232,6 +256,9 @@ if (!$student_profile) {
 
 // Check if student has already set up workplace
 $hasWorkplace = $studentService->hasWorkplace($student_id);
+
+// Check if student has a pending workplace change request
+$hasPendingRequest = $hasWorkplace ? $studentService->hasPendingWorkplaceRequest($student_id) : false;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -552,6 +579,7 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
 
             .detail-card {
                 padding: 1rem;
+                width: auto;
             }
 
             .detail-label {
@@ -687,8 +715,7 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
         .form-input {
             width: 100%;
             padding: 0.75rem;
-            background-color: var(--base-clr);
-            border: 1px solid var(--line-clr);
+            background-color: #777;
             border-radius: 5px;
             color: var(--text-clr);
             font-size: 1rem;
@@ -1138,7 +1165,7 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
             }
 
             .form-input {
-                padding: 0.6rem;
+                padding: 0.3rem;
                 font-size: 0.85rem;
             }
 
@@ -1182,9 +1209,12 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
                     <a href="#" class="btn btn-outline" onclick="openEditProfileModal()" style="font-size: 13px;">
                         <i class="fas fa-edit"></i> Edit Profile
                     </a>
-                    <a href="#" class="btn btn-outline" onclick="openWorkplaceModal()" style="font-size: 13px;">
+                    <a href="#" class="btn btn-outline<?php echo $hasPendingRequest ? ' disabled' : ''; ?>"
+                        onclick="<?php echo $hasPendingRequest ? 'alert(\'You already have a pending workplace change request. Please wait for your instructor to approve or reject it first.\'); return false;' : 'openWorkplaceModal()'; ?>"
+                        style="font-size: 13px;<?php echo $hasPendingRequest ? ' opacity: 0.6; cursor: not-allowed;' : ''; ?>"
+                        title="<?php echo $hasPendingRequest ? 'Pending request awaiting instructor approval' : ''; ?>">
                         <i
-                            class="fa-solid fa-location-crosshairs"></i><?php echo $hasWorkplace ? 'Request Change of Workplace' : 'Set Workplace'; ?>
+                            class="fa-solid fa-location-crosshairs"></i><?php echo $hasPendingRequest ? 'Change Request Pending' : ($hasWorkplace ? 'Request Change of Workplace' : 'Set Workplace'); ?>
                     </a>
                 </div>
 
@@ -1209,6 +1239,121 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
         </div>
 
         <div class="profile-details">
+
+            <div class="detail-card">
+                <h3><i class="fas fa-clock" style="margin-right: 0.5rem; color: var(--accent-clr);"></i>Working Schedule
+                </h3>
+                <?php
+                $scheduleStart = $student_profile['schedule_start_time'] ?? null;
+                $scheduleEnd = $student_profile['schedule_end_time'] ?? null;
+                $scheduleIsSet = !empty($scheduleStart) && !empty($scheduleEnd);
+                ?>
+                <?php if (!$hasWorkplace): ?>
+                    <div
+                        style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); border-radius: 8px; padding: 1rem; color: #cc8400;">
+                        <i class="fas fa-exclamation-triangle"></i> Please set your workplace first before setting your
+                        working schedule.
+                    </div>
+                <?php else: ?>
+                    <?php if ($scheduleIsSet): ?>
+                        <div
+                            style="background: rgba(26, 210, 28, 0.08); border: 1px solid rgba(26, 210, 28, 0.25); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem;">
+                            <div
+                                style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--accent-clr); font-weight: 600;">
+                                <i class="fas fa-check-circle"></i> Current Schedule
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Start Time:</span>
+                                <span class="detail-value">
+                                    <?php echo date('g:i A', strtotime($scheduleStart)); ?>
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">End Time:</span>
+                                <span class="detail-value">
+                                    <?php echo date('g:i A', strtotime($scheduleEnd)); ?>
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Overtime:</span>
+                                <span class="detail-value">
+                                    <?php
+                                    $otEnd = new DateTime($scheduleEnd);
+                                    $otEnd->modify('+4 hours');
+                                    echo date('g:i A', strtotime($scheduleEnd)) . ' - ' . $otEnd->format('g:i A');
+                                    ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div
+                            style="background: rgba(255, 165, 0, 0.08); border: 1px solid rgba(255, 165, 0, 0.25); border-radius: 8px; padding: 0.5rem; margin-bottom: 1rem;">
+                            <div style="color: #cc8400; font-weight: 600; margin-bottom: 0.5rem;">
+                                <i class="fas fa-exclamation-triangle"></i> Schedule Not Set
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--secondary-text-clr); margin: 0;">You must set your
+                                working schedule before you can record attendance.
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                    <form id="scheduleForm" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-right: 1.5rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" for="scheduleStartTime">Start Time</label>
+                                <input type="time" id="scheduleStartTime" name="schedule_start_time" class="form-input"
+                                    required min="05:00" max="22:00"
+                                    value="<?php echo $scheduleIsSet ? date('H:i', strtotime($scheduleStart)) : ''; ?>">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" for="scheduleEndTime">End Time</label>
+                                <input type="time" id="scheduleEndTime" name="schedule_end_time" class="form-input" required
+                                    min="05:00" max="22:00"
+                                    value="<?php echo $scheduleIsSet ? date('H:i', strtotime($scheduleEnd)) : ''; ?>">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="saveScheduleBtn"
+                            style="align-self: flex-start; background: var(--accent-clr); color: var(--base-clr); border: none; padding: 0.6rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            <i class="fas fa-save"></i>
+                            <?php echo $scheduleIsSet ? 'Update Schedule' : 'Save Schedule'; ?>
+                        </button>
+                    </form>
+                    <script>
+                        document.getElementById('scheduleForm')?.addEventListener('submit', function (e) {
+                            e.preventDefault();
+                            const startTime = document.getElementById('scheduleStartTime').value;
+                            const endTime = document.getElementById('scheduleEndTime').value;
+                            if (!startTime || !endTime) { alert('Please fill in both start and end times.'); return; }
+                            if (startTime === endTime) { alert('Start and end time cannot be the same.'); return; }
+                            if (!confirm('Are you sure you want to <?php echo $scheduleIsSet ? "update" : "set"; ?> this schedule?\n\nStart: ' + startTime + '\nEnd: ' + endTime)) return;
+                            const btn = document.getElementById('saveScheduleBtn');
+                            btn.disabled = true;
+                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                            const formData = new FormData();
+                            formData.append('action', 'update_schedule');
+                            formData.append('schedule_start_time', startTime);
+                            formData.append('schedule_end_time', endTime);
+                            fetch('student_profile.php', { method: 'POST', body: formData })
+                                .then(r => r.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        alert(data.message);
+                                        window.location.reload();
+                                    } else {
+                                        alert('Error: ' + (data.error || data.message || 'Unknown error'));
+                                        btn.disabled = false;
+                                        btn.innerHTML = '<i class="fas fa-save"></i> <?php echo $scheduleIsSet ? "Update Schedule" : "Save Schedule"; ?>';
+                                    }
+                                })
+                                .catch(() => {
+                                    alert('Network error. Please try again.');
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-save"></i> <?php echo $scheduleIsSet ? "Update Schedule" : "Save Schedule"; ?>';
+                                });
+                        });
+                    </script>
+                <?php endif; ?>
+            </div>
+
             <div class="detail-card">
                 <h3>Personal Information</h3>
                 <div class="detail-item">
@@ -1259,40 +1404,17 @@ $hasWorkplace = $studentService->hasWorkplace($student_id);
                         </div>
                         <div class="instructor-role">OJT Instructor</div>
                         <div class="instructor-email"
-                            style="color: var(--secondary-text-clr); font-size: 0.85rem; margin-top: 0.25rem;">
-                            <i class="fas fa-envelope" style="margin-right: 0.25rem;"></i>
+                            style="color: var(--secondary-text-clr); font-size: 0.7rem; margin-top: 0.25rem;">
+
                             <?php echo htmlspecialchars($student_profile['instructor_email']); ?>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="detail-card">
-                <h3>System Administrator</h3>
-                <?php if (!empty($student_profile['admins'])): ?>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
-                        <?php foreach ($student_profile['admins'] as $admin): ?>
-                            <div class="admin-card" style="text-align: center;">
-                                <img src="<?php echo htmlspecialchars($admin['profile_pic_path'] ?: '../../storage/images/default_profile.jpg'); ?>"
-                                    alt="<?php echo htmlspecialchars($admin['full_name']); ?>" class="admin-pic"
-                                    style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem;">
-                                <div class="admin-name" style="font-weight: 600; font-size: 0.9rem;">
-                                    <?php echo htmlspecialchars($admin['full_name']); ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="admin-card">
-                        <img src="../../storage/images/default_profile.jpg" alt="Admin" class="admin-pic">
-                        <div class="admin-info">
-                            <div class="admin-name">System Administrator</div>
-                            <div class="admin-role">OJT Chairperson</div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div><br>
+        </div>
+
+        <br>
         <div class="detail-card classmates-section" style="overflow: visible;">
             <h3>Your Classmates</h3>
             <style>

@@ -115,7 +115,9 @@ class StudentService
                 sw.head_trainee,
                 sw.head_trainee_position,
                 sw.head_trainee_contact,
-                sw.head_trainee_email
+                sw.head_trainee_email,
+                sw.schedule_start_time,
+                sw.schedule_end_time
             FROM users u
             LEFT JOIN sections s ON u.section_id = s.id
             LEFT JOIN instructors ON s.instructor_id = instructors.id
@@ -166,6 +168,8 @@ class StudentService
                 'head_trainee_email' => $student['head_trainee_email'] ?? '',
                 'latitude' => $student['workplace_latitude'],
                 'longitude' => $student['workplace_longitude'],
+                'schedule_start_time' => $student['schedule_start_time'],
+                'schedule_end_time' => $student['schedule_end_time'],
                 'ojt_hours' => $ojtHours,
                 'classmates' => $this->getClassmates($student['section_id'], $studentId)
             ];
@@ -330,6 +334,119 @@ class StudentService
     }
 
     /**
+     * Get student schedule (start/end times) from active workplace
+     * @param int $studentId Student DB ID (students.id)
+     * @return array|null ['schedule_start_time' => 'HH:MM:SS', 'schedule_end_time' => 'HH:MM:SS'] or null
+     */
+    public function getStudentSchedule($studentId)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT schedule_start_time, schedule_end_time
+                FROM student_workplaces
+                WHERE student_id = ? AND is_active = 1
+                LIMIT 1
+            ");
+            $stmt->execute([$studentId]);
+            $result = $stmt->fetch();
+            if ($result && $result['schedule_start_time'] && $result['schedule_end_time']) {
+                return $result;
+            }
+            return null;
+        } catch (\PDOException $e) {
+            error_log('Get student schedule error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Update student schedule
+     * @param int $userId User ID from session
+     * @param string $startTime Start time in HH:MM format
+     * @param string $endTime End time in HH:MM format
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function updateStudentSchedule($userId, $startTime, $endTime)
+    {
+        try {
+            // Get student DB ID
+            $studentDbId = $this->getStudentDbId($userId);
+            if (!$studentDbId) {
+                return ['success' => false, 'message' => 'Student not found.'];
+            }
+
+
+            // Validate times
+            $startDt = \DateTime::createFromFormat('H:i', $startTime);
+            $endDt = \DateTime::createFromFormat('H:i', $endTime);
+            if (!$startDt || !$endDt) {
+                return ['success' => false, 'message' => 'Invalid time format. Please use HH:MM.'];
+            }
+
+            // Disallow identical times (no 24-hour shift)
+            if ($startDt == $endDt) {
+                return ['success' => false, 'message' => 'Start and end time cannot be the same.'];
+            }
+
+            // If end time is earlier, assume next day (night shift)
+            if ($endDt < $startDt) {
+                $endDt->modify('+1 day');
+            }
+
+            // Optional: limit maximum shift length (e.g. 16 hours)
+            $interval = $startDt->diff($endDt);
+            $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
+
+            if ($totalHours > 16) {
+                return ['success' => false, 'message' => 'Shift cannot exceed 16 hours.'];
+            }
+
+            // Update the active workplace record
+            $stmt = $this->db->prepare("
+                UPDATE student_workplaces
+                SET schedule_start_time = :start_time, schedule_end_time = :end_time
+                WHERE student_id = :student_id AND is_active = 1
+            ");
+            $result = $stmt->execute([
+                ':start_time' => $startTime . ':00',
+                ':end_time' => $endTime . ':00',
+                ':student_id' => $studentDbId
+            ]);
+
+            if ($result && $stmt->rowCount() > 0) {
+                return ['success' => true, 'message' => 'Working schedule updated successfully.'];
+            } else {
+                // rowCount=0 could mean same values (no actual change) or no active workplace
+                $check = $this->db->prepare("SELECT id FROM student_workplaces WHERE student_id = :sid AND is_active = 1");
+                $check->execute([':sid' => $studentDbId]);
+                if ($check->fetch()) {
+                    return ['success' => true, 'message' => 'Schedule is already up to date.'];
+                }
+                return ['success' => false, 'message' => 'No active workplace found.'];
+            }
+        } catch (\PDOException $e) {
+            error_log('Update student schedule error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Database error occurred.'];
+        }
+    }
+
+    /**
+     * Check if a date is a double hours date
+     * @param string $date Date in Y-m-d format
+     * @return bool
+     */
+    public function isDoubleHoursDate($date)
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT 1 FROM double_hours_dates WHERE date = ? LIMIT 1");
+            $stmt->execute([$date]);
+            return (bool) $stmt->fetch();
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
+    /**
      * Submit workplace change request
      * 
      * @param int $userId User ID
@@ -395,6 +512,29 @@ class StudentService
             ]);
         } catch (\PDOException $e) {
             error_log('Submit workplace change request error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if student has a pending workplace change request
+     * 
+     * @param int $userId User ID (student_id in workplace_change_requests)
+     * @return bool True if a pending request exists
+     */
+    public function hasPendingWorkplaceRequest($userId)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) as cnt 
+                FROM workplace_change_requests 
+                WHERE student_id = :student_id AND status = 'pending'
+            ");
+            $stmt->execute([':student_id' => $userId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return ($row['cnt'] > 0);
+        } catch (\PDOException $e) {
+            error_log('Check pending workplace request error: ' . $e->getMessage());
             return false;
         }
     }
@@ -762,11 +902,11 @@ class StudentService
         $currentDate = $now->format('Y-m-d');
         $currentTime = $now->format('Y-m-d H:i:s');
 
-        // 1. Get Student Workplace Coords
+        // 1. Get Student Workplace Coords and Schedule
         $stmt = $this->db->prepare("
-            SELECT workplace_latitude, workplace_longitude 
+            SELECT workplace_latitude, workplace_longitude, schedule_start_time, schedule_end_time
             FROM student_workplaces 
-            WHERE student_id = ? 
+            WHERE student_id = ? AND is_active = 1
             ORDER BY id DESC LIMIT 1
         ");
         $stmt->execute([$studentId]);
@@ -775,18 +915,51 @@ class StudentService
             return ['success' => false, 'message' => 'No workplace assigned.'];
         }
 
-        // 2. Calculate Distance
-        $distance = $this->calculateDistance($lat, $lng, $workplace['workplace_latitude'], $workplace['workplace_longitude']);
-
-        // Strict restriction: Allow up to 60 meters (covering the "50-60 meter" exception)
-        if ($distance > 60) {
-            return [
-                'success' => false,
-                'message' => 'You are too far from your workplace to time in. Maximum allowed distance is 60 meters. Current distance: ' . round($distance) . 'm.'
-            ];
+        // Check if schedule is set
+        if (!$workplace['schedule_start_time'] || !$workplace['schedule_end_time']) {
+            return ['success' => false, 'message' => 'Please set your working schedule in your profile before recording attendance.'];
         }
 
-        $withinRadius = 1; // Considered within allowed radius since we rejected > 60
+        // Determine block type from schedule instead of client input
+        $scheduleStart = new \DateTime($currentDate . ' ' . $workplace['schedule_start_time'], $phpTimezone);
+        $scheduleEnd = new \DateTime($currentDate . ' ' . $workplace['schedule_end_time'], $phpTimezone);
+        
+        // Handle night shift: if end time is earlier than start time, it means end time is next day
+        if ($scheduleEnd < $scheduleStart) {
+            $scheduleEnd->modify('+1 day');
+        }
+        
+        $actualBlockType = ($now >= $scheduleEnd) ? 'overtime' : 'regular';
+
+        // Validate the block type matches what the client sent (for safety)
+        if ($blockType !== $actualBlockType) {
+            $blockType = $actualBlockType; // Server-side determination takes priority
+        }
+
+        // Check if overtime window has ended (schedule_end + 4 hours)
+        if ($blockType === 'overtime') {
+            $overtimeEnd = clone $scheduleEnd;
+            $overtimeEnd->modify('+4 hours');
+            if ($now > $overtimeEnd) {
+                return ['success' => false, 'message' => 'Overtime window has ended.'];
+            }
+        }
+
+        // Check if regular block hasn't started yet
+        if ($blockType === 'regular') {
+            // Allow time-in starting 30 minutes before schedule start
+            $earlyStart = clone $scheduleStart;
+            $earlyStart->modify('-30 minutes');
+            if ($now < $earlyStart) {
+                return ['success' => false, 'message' => 'Your shift has not started yet. You can time in starting 30 minutes before your scheduled start time.'];
+            }
+        }
+
+        // 2. Calculate Distance (track but don't block)
+        $distance = $this->calculateDistance($lat, $lng, $workplace['workplace_latitude'], $workplace['workplace_longitude']);
+
+        // Track whether student is within the allowed radius (60m)
+        $withinRadius = ($distance <= 60) ? 1 : 0;
 
         // 3. Save Image
         if (preg_match('/^data:image\/(\w+);base64,/', $photoData, $type)) {
@@ -835,7 +1008,16 @@ class StudentService
                 $msg .= ' (Note: You are ' . round($distance) . 'm away, which is within the extended 60m allowance)';
             }
 
-            return ['success' => true, 'message' => $msg, 'within_radius' => $withinRadius];
+            // Check if student is late (timed in after schedule start)
+            $lateMinutes = 0;
+            if ($blockType === 'regular') {
+                // Use the already calculated scheduleStart which handles night shifts properly
+                if ($now > $scheduleStart) {
+                    $lateMinutes = (int) round(($now->getTimestamp() - $scheduleStart->getTimestamp()) / 60);
+                }
+            }
+
+            return ['success' => true, 'message' => $msg, 'within_radius' => $withinRadius, 'late_minutes' => $lateMinutes];
         } catch (\PDOException $e) {
             if ($e->getCode() == 23000) {
                 return ['success' => false, 'message' => 'You have already timed in for this block today.'];
@@ -878,14 +1060,39 @@ class StudentService
                 return ['success' => false, 'message' => 'You have already timed out for this block.'];
             }
 
-            // 2. Check if block period has ended
-            $blockEndTimes = [
-                'morning' => '12:00:00',
-                'afternoon' => '18:00:00',
-                'overtime' => '22:00:00'
-            ];
+            // 2. Get student schedule for dynamic block end times
+            $scheduleStmt = $this->db->prepare("
+            SELECT schedule_start_time, schedule_end_time
+            FROM student_workplaces
+            WHERE student_id = ? AND is_active = 1
+            LIMIT 1
+        ");
+            $scheduleStmt->execute([$studentId]);
+            $schedule = $scheduleStmt->fetch();
 
-            $blockEndTime = $blockEndTimes[$blockType] ?? null;
+            // Determine block end time dynamically from schedule
+            $blockEndTime = null;
+            if ($schedule && $schedule['schedule_end_time']) {
+                if ($blockType === 'regular') {
+                    $blockEndTime = $schedule['schedule_end_time'];
+                } elseif ($blockType === 'overtime') {
+                    // Overtime ends 4 hours after schedule end
+                    $endDt = new \DateTime($schedule['schedule_end_time']);
+                    $endDt->modify('+4 hours');
+                    $blockEndTime = $endDt->format('H:i:s');
+                }
+            }
+
+            // Fallback for legacy block types (morning/afternoon/overtime)
+            if (!$blockEndTime) {
+                $legacyEndTimes = [
+                    'morning' => '12:00:00',
+                    'afternoon' => '18:00:00',
+                    'overtime' => '22:00:00'
+                ];
+                $blockEndTime = $legacyEndTimes[$blockType] ?? null;
+            }
+
             if (!$blockEndTime) {
                 $this->db->rollBack();
                 return ['success' => false, 'message' => 'Invalid block type.'];
@@ -932,20 +1139,29 @@ class StudentService
             $updatedRecord = $stmt->fetch();
             $hoursWorked = round($updatedRecord['hours'], 2);
 
+            // Apply double hours multiplier if this is a double hours date
+            $isDoubleDay = $this->isDoubleHoursDate($record['attendance_date']);
+            if ($isDoubleDay) {
+                $hoursWorked = round($hoursWorked * 2, 2);
+                // Update the record with doubled hours
+                $stmt = $this->db->prepare("UPDATE attendance_records SET hours = ? WHERE id = ?");
+                $stmt->execute([$hoursWorked, $record['id']]);
+            }
+
             // CRITICAL FIX: Validate hours before proceeding
-            if ($hoursWorked > 12) {
-                // This should never happen due to LEAST() above, but double-check
+            $maxHours = $isDoubleDay ? 24 : 12;
+            if ($hoursWorked > $maxHours) {
                 $this->db->rollBack();
                 error_log("CRITICAL: Hours overflow detected for student {$studentId}, block {$blockType}: {$hoursWorked} hours");
                 return [
                     'success' => false,
-                    'message' => 'Invalid hours detected (maximum 12 hours per block). Please contact your instructor or administrator.'
+                    'message' => "Invalid hours detected (maximum {$maxHours} hours per block). Please contact your instructor or administrator."
                 ];
             }
 
             // Log warning for unusually high hours (but still valid)
-            if ($hoursWorked > 8) {
-                error_log("WARNING: High hours detected for student {$studentId}, block {$blockType}: {$hoursWorked} hours");
+            if ($hoursWorked > ($isDoubleDay ? 16 : 8)) {
+                error_log("WARNING: High hours detected for student {$studentId}, block {$blockType}: {$hoursWorked} hours" . ($isDoubleDay ? ' (double hours day)' : ''));
             }
 
             // 4. Update ojt_summaries table with row lock to prevent race conditions
@@ -1050,26 +1266,43 @@ class StudentService
     {
         try {
             $stmt = $this->db->prepare("
-                SELECT *, 
-                       attendance_date, 
-                       time_in, 
-                       block_type,
-                       forgot_timeout_reason as reason,
-                       forgot_timeout_file as letter_file_path,
-                       request_status as status,
-                       instructor_response
-                FROM attendance_records 
-                WHERE student_id = ? 
-                AND (
-                    time_out IS NULL
-                    OR request_status IS NOT NULL
-                    OR missing_timeout_flagged_at IS NOT NULL
-                )
-                ORDER BY attendance_date DESC, block_type ASC
+                SELECT ar.*,
+                       ar.attendance_date,
+                       ar.time_in,
+                       ar.block_type,
+                       ar.forgot_timeout_reason  AS reason,
+                       ar.forgot_timeout_file    AS letter_file_path,
+                       ar.request_status         AS status,
+                       ar.instructor_response,
+                       sw.schedule_end_time
+                FROM attendance_records ar
+                LEFT JOIN student_workplaces sw
+                       ON sw.student_id = ar.student_id
+                      AND sw.is_active = 1
+                WHERE ar.student_id = ?
+                  AND ar.time_in   IS NOT NULL     -- must have timed in
+                  AND ar.time_out  IS NULL          -- must NOT have timed out
+                  AND (
+                        -- Already submitted: always show so student can track feedback
+                        ar.request_status IS NOT NULL
+
+                        OR (
+                            -- Past days: session is definitely over
+                            ar.attendance_date < CURDATE()
+
+                            OR (
+                                -- Today: only show if the scheduled end time has passed
+                                ar.attendance_date = CURDATE()
+                                AND TIME(NOW()) > COALESCE(sw.schedule_end_time, '18:00:00')
+                            )
+                        )
+                  )
+                ORDER BY ar.attendance_date DESC, ar.block_type ASC
             ");
             $stmt->execute([$studentId]);
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
+            error_log('getMissingTimeouts error: ' . $e->getMessage());
             return [];
         }
     }
@@ -1176,6 +1409,13 @@ class StudentService
             $stmt->execute([$recordId]);
             $updated = $stmt->fetch();
             $hoursWorked = round($updated['hours'], 2);
+
+            // Apply double hours multiplier if applicable
+            if ($this->isDoubleHoursDate($record['attendance_date'])) {
+                $hoursWorked = round($hoursWorked * 2, 2);
+                $stmt = $this->db->prepare("UPDATE attendance_records SET hours = ? WHERE id = ?");
+                $stmt->execute([$hoursWorked, $recordId]);
+            }
 
             return [
                 'success' => true,

@@ -83,10 +83,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $accuracyQualityPoints = isset($_POST['accuracyQualityPoints']) && $_POST['accuracyQualityPoints'] !== '' ? floatval($_POST['accuracyQualityPoints']) : null;
         $professionalPresentationPoints = isset($_POST['professionalPresentationPoints']) && $_POST['professionalPresentationPoints'] !== '' ? floatval($_POST['professionalPresentationPoints']) : null;
         $result = $instructorService->updateSubmissionStatus($subId, $status, $feedback, $points, $accuracyQualityPoints, $professionalPresentationPoints);
+
+        // Send email notification to student
+        if ($result['success']) {
+            try {
+                require_once '../../app/services/EmailService.php';
+                $config = require __DIR__ . '/../../config/database.php';
+                $dsn = sprintf("mysql:host=%s;dbname=%s;charset=%s", $config['host'], $config['dbname'], $config['charset']);
+                $db = new PDO($dsn, $config['username'], $config['password'], $config['options']);
+
+                // Get student email, name, and document name from submission
+                $stmt = $db->prepare("
+                    SELECT u.email, u.full_name AS student_name, dt.name AS document_name
+                    FROM document_submissions ds
+                    JOIN students s ON ds.student_id = s.id
+                    JOIN users u ON s.user_id = u.id
+                    JOIN document_types dt ON ds.document_type_id = dt.id
+                    WHERE ds.id = ?
+                ");
+                $stmt->execute([$subId]);
+                $info = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($info && !empty($info['email'])) {
+                    $emailService = new \App\Services\EmailService();
+                    $statusLabel = ucfirst($status);
+                    $statusColors = [
+                        'approved' => '#22c55e',
+                        'revise' => '#4da6ff',
+                        'rejected' => '#ff4d4d'
+                    ];
+                    $statusColor = $statusColors[$status] ?? '#888';
+                    $loginLink = 'https://ojtroute.ccs-chmsualijis.com/public/student/student_documents.php';
+
+                    $feedbackHtml = '';
+                    if (!empty($feedback)) {
+                        $feedbackHtml = '
+                        <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid ' . $statusColor . '; border-radius: 4px;">
+                            <strong style="color: #333;">Instructor Feedback:</strong>
+                            <p style="margin: 8px 0 0; color: #555;">' . htmlspecialchars($feedback) . '</p>
+                        </div>';
+                    }
+
+                    $subject = "Document $statusLabel - " . $info['document_name'];
+                    $body = '
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
+                        <div style="background: #1a1b2e; padding: 24px; text-align: center;">
+                            <h2 style="color: #1ad21c; margin: 0; font-size: 1.4rem;">OJT Route System</h2>
+                        </div>
+                        <div style="padding: 30px;">
+                            <p style="color: #333; font-size: 1rem;">Hi <strong>' . htmlspecialchars($info['student_name']) . '</strong>,</p>
+                            <p style="color: #555;">Your document <strong>"' . htmlspecialchars($info['document_name']) . '"</strong> has been reviewed by your instructor.</p>
+                            <div style="text-align: center; margin: 25px 0;">
+                                <span style="display: inline-block; padding: 10px 28px; background: ' . $statusColor . '; color: #fff; border-radius: 25px; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px;">' . $statusLabel . '</span>
+                            </div>
+                            ' . $feedbackHtml . '
+                            <div style="text-align: center; margin: 30px 0 10px;">
+                                <a href="' . $loginLink . '" style="display: inline-block; padding: 12px 32px; background: #1ad21c; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600;">View Your Documents</a>
+                            </div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 16px; text-align: center; color: #999; font-size: 0.8rem;">
+                            This is an automated message from OJT Route System.
+                        </div>
+                    </div>';
+
+                    $emailService->sendEmail($info['email'], $subject, $body);
+                }
+            } catch (Exception $e) {
+                error_log('Document review email error: ' . $e->getMessage());
+            }
+        }
     } elseif ($_POST['action'] === 'bulk_approve') {
         $ids = json_decode($_POST['submission_ids'], true);
         if ($ids) {
             $result = $instructorService->bulkUpdateSubmissionStatus($ids, 'approved');
+
+            // Send email notifications for each approved submission
+            if ($result['success']) {
+                try {
+                    require_once '../../app/services/EmailService.php';
+                    $config = require __DIR__ . '/../../config/database.php';
+                    $dsn = sprintf("mysql:host=%s;dbname=%s;charset=%s", $config['host'], $config['dbname'], $config['charset']);
+                    $db = new PDO($dsn, $config['username'], $config['password'], $config['options']);
+                    $emailService = new \App\Services\EmailService();
+                    $loginLink = 'https://ojtroute.ccs-chmsualijis.com/public/student/student_documents.php';
+
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $stmt = $db->prepare("
+                        SELECT ds.id, u.email, u.full_name AS student_name, dt.name AS document_name
+                        FROM document_submissions ds
+                        JOIN students s ON ds.student_id = s.id
+                        JOIN users u ON s.user_id = u.id
+                        JOIN document_types dt ON ds.document_type_id = dt.id
+                        WHERE ds.id IN ($placeholders)
+                    ");
+                    $stmt->execute($ids);
+                    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($rows as $info) {
+                        if (empty($info['email']))
+                            continue;
+                        $subject = "Document Approved - " . $info['document_name'];
+                        $body = '
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
+                            <div style="background: #1a1b2e; padding: 24px; text-align: center;">
+                                <h2 style="color: #1ad21c; margin: 0; font-size: 1.4rem;">OJT Route System</h2>
+                            </div>
+                            <div style="padding: 30px;">
+                                <p style="color: #333; font-size: 1rem;">Hi <strong>' . htmlspecialchars($info['student_name']) . '</strong>,</p>
+                                <p style="color: #555;">Your document <strong>"' . htmlspecialchars($info['document_name']) . '"</strong> has been reviewed by your instructor.</p>
+                                <div style="text-align: center; margin: 25px 0;">
+                                    <span style="display: inline-block; padding: 10px 28px; background: #22c55e; color: #fff; border-radius: 25px; font-weight: 700; font-size: 1.1rem;">Approved</span>
+                                </div>
+                                <div style="text-align: center; margin: 30px 0 10px;">
+                                    <a href="' . $loginLink . '" style="display: inline-block; padding: 12px 32px; background: #1ad21c; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600;">View Your Documents</a>
+                                </div>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 16px; text-align: center; color: #999; font-size: 0.8rem;">
+                                This is an automated message from OJT Route System.
+                            </div>
+                        </div>';
+                        $emailService->sendEmail($info['email'], $subject, $body);
+                    }
+                } catch (Exception $e) {
+                    error_log('Bulk approve email error: ' . $e->getMessage());
+                }
+            }
         } else {
             $result = ['success' => false, 'message' => 'No items selected'];
         }
@@ -388,6 +509,70 @@ $otherDocs = array_filter($documentTypes, function ($d) {
             max-width: 280px;
             white-space: normal;
             color: rgba(255, 255, 255, 0.85);
+        }
+
+        .doc-info-panel {
+            border-top: 1px solid var(--line-clr);
+            background: var(--base-clr);
+        }
+
+        .doc-info-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--accent-clr);
+            user-select: none;
+        }
+
+        .doc-info-panel-header:hover {
+            background: var(--hover-clr);
+        }
+
+        .doc-info-toggle-icon {
+            transition: transform 0.2s;
+            font-size: 0.75rem;
+        }
+
+        .doc-info-panel.collapsed .doc-info-toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .doc-info-panel.collapsed .doc-info-panel-body {
+            display: none;
+        }
+
+        .doc-info-panel-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem 1.5rem;
+            padding: 0.5rem 1rem 0.75rem;
+        }
+
+        .doc-info-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .doc-info-label {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .doc-info-value {
+            font-size: 0.85rem;
+            color: var(--text-clr);
+            word-break: break-word;
+        }
+
+        .doc-info-row:first-child {
+            grid-column: 1 / -1;
         }
 
         .col-check {
@@ -993,8 +1178,6 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                             <th>Document Type</th>
                             <th>Status</th>
                             <th>Date Submitted</th>
-                            <th>Feedback</th>
-                            <th>Points</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -1002,7 +1185,7 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
                         <?php if (empty($submissions)): ?>
                             <tr>
-                                <td colspan="7" class="empty-state" style="padding: 2rem;">No submissions found.</td>
+                                <td colspan="6" class="empty-state" style="padding: 2rem;">No submissions found.</td>
                             </tr>
                         <?php endif; ?>
                         <?php foreach ($submissions as $row): ?>
@@ -1047,22 +1230,10 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                                     </span>
                                 </td>
                                 <td data-date><?php echo date('M d, Y', strtotime($row['submitted_at'])); ?></td>
-                                <td class="feedback" data-feedback>
-                                    <?php echo $row['feedback'] ? htmlspecialchars($row['feedback']) : '<span style="opacity:0.65;">No feedback</span>'; ?>
-                                </td>
-                                <td style="text-align: center;">
-                                    <?php if ($row['points'] !== null): ?>
-                                        <span style="color: var(--accent-clr); font-weight: 700; font-size: 0.9rem;">
-                                            <?php echo number_format($row['points'], 1); ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span style="opacity: 0.5; font-size: 0.85rem;">-</span>
-                                    <?php endif; ?>
-                                </td>
                                 <td>
                                     <div class="actions">
                                         <button class="icon-btn" type="button" data-action="view" title="View"
-                                            onclick="window.openDocModal('<?php echo htmlspecialchars($row['file_path']); ?>', '<?php echo htmlspecialchars($row['document_type']); ?>')">
+                                            onclick="window.openDocModal('<?php echo htmlspecialchars($row['file_path']); ?>', '<?php echo htmlspecialchars($row['document_type']); ?>', <?php echo htmlspecialchars(json_encode($row['feedback'] ?? ''), ENT_QUOTES); ?>, '<?php echo $row['points'] ?? ''; ?>', '<?php echo $row['accuracyQualityPoints'] ?? ''; ?>', '<?php echo $row['professionalPresentationPoints'] ?? ''; ?>')">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                         <button class="icon-btn" type="button" title="Process Approval"
@@ -1099,6 +1270,31 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                 <div id="imagePreviewContainer" class="image-preview-container">
                     <div class="image-document-wrapper">
                         <img id="imagePreview" src="" alt="Document Preview">
+                    </div>
+                </div>
+            </div>
+            <div id="docInfoPanel" class="doc-info-panel" style="display:none;">
+                <div class="doc-info-panel-header"
+                    onclick="document.getElementById('docInfoPanel').classList.toggle('collapsed')">
+                    <span><i class="fas fa-info-circle" style="margin-right:0.4rem;"></i>Feedback & Points</span>
+                    <i class="fas fa-chevron-down doc-info-toggle-icon"></i>
+                </div>
+                <div class="doc-info-panel-body">
+                    <div class="doc-info-row">
+                        <span class="doc-info-label">Feedback</span>
+                        <span id="docInfoFeedback" class="doc-info-value">-</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-info-label">Bonus Points</span>
+                        <span id="docInfoBonus" class="doc-info-value">-</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-info-label">Accuracy & Quality</span>
+                        <span id="docInfoAccuracy" class="doc-info-value">-</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-info-label">Professional Presentation</span>
+                        <span id="docInfoPresentation" class="doc-info-value">-</span>
                     </div>
                 </div>
             </div>
@@ -1421,7 +1617,7 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
 
             // Global scope for view button
-            window.openDocModal = function (fileUrl, title) {
+            window.openDocModal = function (fileUrl, title, feedback, bonus, accuracy, presentation) {
                 if (!docModal || !docDownloadBtn) return;
 
                 docDownloadBtn.href = fileUrl;
@@ -1430,12 +1626,30 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                     if (titleEl) titleEl.textContent = title;
                 }
 
+                // Populate info panel - show for submissions (feedback arg defined), hide for templates
+                const infoPanel = document.getElementById('docInfoPanel');
+                if (infoPanel) {
+                    if (typeof feedback !== 'undefined') {
+                        // Called from submission row - always show panel
+                        infoPanel.style.display = 'block';
+                        infoPanel.classList.remove('collapsed');
+                        const hasFeedback = feedback && feedback.trim() !== '';
+                        document.getElementById('docInfoFeedback').textContent = hasFeedback ? feedback : 'No feedback';
+                        document.getElementById('docInfoBonus').textContent = bonus && bonus !== '' ? parseFloat(bonus).toFixed(1) : '-';
+                        document.getElementById('docInfoAccuracy').textContent = accuracy && accuracy !== '' ? parseFloat(accuracy).toFixed(1) : '-';
+                        document.getElementById('docInfoPresentation').textContent = presentation && presentation !== '' ? parseFloat(presentation).toFixed(1) : '-';
+                    } else {
+                        // Called from template view - hide panel
+                        infoPanel.style.display = 'none';
+                    }
+                }
+
                 // Check file extension
                 const lowerUrl = fileUrl.toLowerCase();
                 const isDocx = lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc');
-                const isImage = lowerUrl.endsWith('.png') || lowerUrl.endsWith('.jpg') || 
-                               lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.gif') || 
-                               lowerUrl.endsWith('.webp');
+                const isImage = lowerUrl.endsWith('.png') || lowerUrl.endsWith('.jpg') ||
+                    lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.gif') ||
+                    lowerUrl.endsWith('.webp');
 
                 // Hide all preview containers first
                 if (docFrame) docFrame.style.display = 'none';
@@ -1464,10 +1678,10 @@ $otherDocs = array_filter($documentTypes, function ($d) {
                                 inWrapper: true,
                                 ignoreWidth: false,
                                 ignoreHeight: false,
-                                ignoreFonts: true,  // Use system fonts to avoid CSP issues
+                                ignoreFonts: true,
                                 breakPages: true,
                                 ignoreLastRenderedPageBreak: true,
-                                useBase64URL: true,  // Use data: URLs for images (allowed by CSP, unlike blob:)
+                                useBase64URL: true,
                                 renderHeaders: true,
                                 renderFooters: true,
                                 renderFootnotes: true,
@@ -1544,18 +1758,11 @@ $otherDocs = array_filter($documentTypes, function ($d) {
 
             function setStatus(row, status, feedbackText) {
                 const badge = row.querySelector('[data-status]');
-                const feedbackEl = row.querySelector('[data-feedback]');
-                if (!badge || !feedbackEl) return;
+                if (!badge) return;
 
                 badge.classList.remove('status-pending', 'status-approve', 'status-revise', 'status-reject');
                 badge.classList.add('status-' + status);
                 badge.textContent = status;
-
-                if (typeof feedbackText === 'string') {
-                    feedbackEl.innerHTML = feedbackText.trim() !== ''
-                        ? feedbackText
-                        : '<span style="opacity:0.65;">No feedback</span>';
-                }
             }
 
             function getVisibleRows() {

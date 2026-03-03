@@ -44,8 +44,9 @@ $documents = $studentService->getStudentDocuments($userId);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         .document-container {
-            padding: 2rem;
-            max-width: 1200px;
+            padding: 2rem 1rem;
+            width: 100%;
+            box-sizing: border-box;
             margin: 0 auto;
         }
 
@@ -80,7 +81,8 @@ $documents = $studentService->getStudentDocuments($userId);
 
         .search-container {
             margin: 1.5rem 0;
-            max-width: 400px;
+            width: 100%;
+            max-width: 100%;
         }
 
         .search-container input {
@@ -90,6 +92,7 @@ $documents = $studentService->getStudentDocuments($userId);
             border: 1px solid #3e3f4d;
             background: #2a2b3a;
             color: #fff;
+            box-sizing: border-box;
         }
 
         .documents-table {
@@ -372,10 +375,10 @@ $documents = $studentService->getStudentDocuments($userId);
         @media (max-width: 768px) {
             .document-container {
                 padding: 1rem 0.5rem;
-                width: 20rem;
+                width: 80%;
                 max-width: 100%;
                 box-sizing: border-box;
-                margin: 0 auto;
+                margin: 0;
             }
 
             h1 {
@@ -387,31 +390,27 @@ $documents = $studentService->getStudentDocuments($userId);
                 gap: 0.25rem;
                 margin: 0.75rem 0;
                 padding: 0.5rem 0;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .nav-pills::-webkit-scrollbar {
+                display: none;
             }
 
             .nav-link {
                 padding: 0.5rem 0.75rem;
                 font-size: 0.8rem;
-                border-radius: 20px;
-                background: #2a2b3a;
-                border: 1px solid #3e3f4d;
-            }
-
-            .nav-link.active {
-                background: var(--accent-clr);
-                color: #fff;
-                border-color: var(--accent-clr);
-                border-bottom: none;
-            }
-
-            .search-container {
-                margin: 1rem 0;
             }
 
             .search-container input {
-                padding: 0.75rem 1rem;
-                font-size: 1rem;
-                border-radius: 25px;
+                padding: 0.6rem 0.8rem;
+                font-size: 0.9rem;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             /* Hide table on mobile, show cards */
@@ -443,20 +442,19 @@ $documents = $studentService->getStudentDocuments($userId);
                 justify-content: space-between;
                 align-items: flex-start;
                 margin-bottom: 0.75rem;
+                gap: 0.5rem;
             }
 
             .document-card-title {
                 display: flex;
-                align-items: center;
+                align-items: flex-start;
                 gap: 0.5rem;
                 font-weight: 600;
                 color: #fff;
                 font-size: 0.95rem;
                 flex: 1;
-            }
-
-            .document-card-title i {
-                color: var(--accent-clr);
+                min-width: 0;
+                flex-wrap: wrap;
             }
 
             .document-card-code {
@@ -464,6 +462,8 @@ $documents = $studentService->getStudentDocuments($userId);
                 color: #888;
                 margin-top: 0.25rem;
                 margin-left: 1.5rem;
+                word-break: break-all;
+                overflow-wrap: break-word;
             }
 
             .document-card-body {
@@ -539,12 +539,16 @@ $documents = $studentService->getStudentDocuments($userId);
                 padding: 0.25rem 0.6rem;
                 font-size: 0.75rem;
                 min-width: auto;
+                white-space: nowrap;
+                flex-shrink: 0;
             }
 
             .pre-req-badge {
                 font-size: 0.6rem;
                 padding: 2px 5px;
                 margin-left: 0;
+                white-space: nowrap;
+                flex-shrink: 0;
             }
 
             /* Modal improvements */
@@ -622,7 +626,7 @@ $documents = $studentService->getStudentDocuments($userId);
         @media (max-width: 400px) {
             .document-container {
                 padding: 0.75rem 0.25rem;
-                width: 20rem;
+                width: 80%;
                 max-width: 100%;
             }
 
@@ -642,11 +646,14 @@ $documents = $studentService->getStudentDocuments($userId);
             .search-container input {
                 padding: 0.6rem 0.8rem;
                 font-size: 0.9rem;
-                width: 17.5rem;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             .document-card {
                 padding: 0.75rem;
+
             }
 
             .document-card-header {
@@ -662,6 +669,8 @@ $documents = $studentService->getStudentDocuments($userId);
             .document-card-code {
                 margin-left: 1.25rem;
                 font-size: 0.7rem;
+                word-break: break-all;
+                overflow-wrap: break-word;
             }
 
             .document-card-body {
@@ -809,18 +818,18 @@ $documents = $studentService->getStudentDocuments($userId);
             <h1>Document Submission</h1>
 
             <?php if (isset($_SESSION['success_msg'])): ?>
-                    <div
-                        style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(46, 204, 113, 0.3);">
-                        <?php echo $_SESSION['success_msg'];
-                        unset($_SESSION['success_msg']); ?>
-                    </div>
+                <div
+                    style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(46, 204, 113, 0.3);">
+                    <?php echo $_SESSION['success_msg'];
+                    unset($_SESSION['success_msg']); ?>
+                </div>
             <?php endif; ?>
             <?php if (isset($_SESSION['error_msg'])): ?>
-                    <div
-                        style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(231, 76, 60, 0.3);">
-                        <?php echo $_SESSION['error_msg'];
-                        unset($_SESSION['error_msg']); ?>
-                    </div>
+                <div
+                    style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid rgba(231, 76, 60, 0.3);">
+                    <?php echo $_SESSION['error_msg'];
+                    unset($_SESSION['error_msg']); ?>
+                </div>
             <?php endif; ?>
 
             <!-- Filters -->
@@ -851,9 +860,9 @@ $documents = $studentService->getStudentDocuments($userId);
                     </thead>
                     <tbody id="documentsTableBody">
                         <?php if (empty($documents)): ?>
-                                <tr>
-                                    <td colspan="6" style="text-align:center; color:#888;">No document requirements found.</td>
-                                </tr>
+                            <tr>
+                                <td colspan="6" style="text-align:center; color:#888;">No document requirements found.</td>
+                            </tr>
                         <?php endif; ?>
 
                         <?php foreach ($documents as $doc):
@@ -861,111 +870,111 @@ $documents = $studentService->getStudentDocuments($userId);
                             $statusClass = 'status-' . strtolower($status);
                             $isPreReq = $doc['is_pre_required'];
                             ?>
-                                <tr data-status="<?php echo strtolower($status); ?>"
-                                    data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
-                                    <td>
-                                        <div class="document-name">
-                                            <i class="fas fa-file-alt"></i>
-                                            <?php echo htmlspecialchars($doc['name']); ?>
-                                            <?php if ($isPreReq): ?>
-                                                    <span class="pre-req-badge"
-                                                        title="You must approve this before starting OJT">Required</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div style="font-size:0.8rem; color:#666; margin-left:26px; margin-top:4px;">
-                                            <?php echo htmlspecialchars($doc['code']); ?>
-                                        </div>
-                                    </td>
-                                    <td style="text-transform: capitalize;">
-                                        <?php echo str_replace('_', ' ', $doc['category']); ?>
-                                    </td>
-                                    <td>
-                                        <span class="status <?php echo $statusClass; ?>">
-                                            <?php echo ucfirst($status); ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        // Check if deadline exists and is valid
-                                        if ($doc['deadline'] && $doc['deadline'] != '0000-00-00' && $doc['deadline'] != '0000-00-00 00:00:00') {
-                                            try {
-                                                $deadline = new DateTime($doc['deadline']);
-                                                $today = new DateTime();
-                                                $daysLeft = $today->diff($deadline)->days;
-                                                $isPast = $today > $deadline;
+                            <tr data-status="<?php echo strtolower($status); ?>"
+                                data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
+                                <td>
+                                    <div class="document-name">
+                                        <i class="fas fa-file-alt"></i>
+                                        <?php echo htmlspecialchars($doc['name']); ?>
+                                        <?php if ($isPreReq): ?>
+                                            <span class="pre-req-badge"
+                                                title="You must approve this before starting OJT">Required</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#666; margin-left:26px; margin-top:4px;">
+                                        <?php echo htmlspecialchars($doc['code']); ?>
+                                    </div>
+                                </td>
+                                <td style="text-transform: capitalize;">
+                                    <?php echo str_replace('_', ' ', $doc['category']); ?>
+                                </td>
+                                <td>
+                                    <span class="status <?php echo $statusClass; ?>">
+                                        <?php echo ucfirst($status); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php
+                                    // Check if deadline exists and is valid
+                                    if ($doc['deadline'] && $doc['deadline'] != '0000-00-00' && $doc['deadline'] != '0000-00-00 00:00:00') {
+                                        try {
+                                            $deadline = new DateTime($doc['deadline']);
+                                            $today = new DateTime();
+                                            $daysLeft = $today->diff($deadline)->days;
+                                            $isPast = $today > $deadline;
 
-                                                echo '<span style="';
-                                                if ($isPast && $status === 'Missing') {
-                                                    echo 'color: #e74c3c; font-weight: bold;';
-                                                } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
-                                                    echo 'color: #f39c12; font-weight: bold;';
-                                                }
-                                                echo '">';
-                                                echo date('M d, Y', strtotime($doc['deadline']));
-                                                if ($isPast && $status === 'Missing') {
-                                                    echo ' <i class="fas fa-exclamation-triangle" title="Overdue"></i>';
-                                                } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
-                                                    echo ' (' . $daysLeft . ' days left)';
-                                                }
-                                                echo '</span>';
-                                            } catch (Exception $e) {
-                                                echo '<span style="color: #888;">No deadline</span>';
+                                            echo '<span style="';
+                                            if ($isPast && $status === 'Missing') {
+                                                echo 'color: #e74c3c; font-weight: bold;';
+                                            } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
+                                                echo 'color: #f39c12; font-weight: bold;';
                                             }
-                                        } else {
+                                            echo '">';
+                                            echo date('M d, Y', strtotime($doc['deadline']));
+                                            if ($isPast && $status === 'Missing') {
+                                                echo ' <i class="fas fa-exclamation-triangle" title="Overdue"></i>';
+                                            } elseif ($daysLeft <= 3 && !$isPast && $status === 'Missing') {
+                                                echo ' (' . $daysLeft . ' days left)';
+                                            }
+                                            echo '</span>';
+                                        } catch (Exception $e) {
                                             echo '<span style="color: #888;">No deadline</span>';
                                         }
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($doc['feedback']): ?>
-                                                <span style="color: #e74c3c; font-size: 0.9rem;"><i class="fas fa-comment-alt"></i>
-                                                    <?php echo htmlspecialchars($doc['feedback']); ?></span>
-                                        <?php else: ?>
-                                                <span style="color: #666;">-</span>
+                                    } else {
+                                        echo '<span style="color: #888;">No deadline</span>';
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php if ($doc['feedback'] && strtolower($status) !== 'approved'): ?>
+                                        <span style="color: #e74c3c; font-size: 0.9rem;"><i class="fas fa-comment-alt"></i>
+                                            <?php echo htmlspecialchars($doc['feedback']); ?></span>
+                                    <?php else: ?>
+                                        <span style="color: #666;">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <!-- Actions -->
+                                    <div style="display:flex;">
+
+                                        <!-- Download Template if available -->
+                                        <?php if ($doc['template_path']): ?>
+                                            <a href="<?php echo htmlspecialchars($doc['template_path']); ?>"
+                                                class="action-btn download" title="Download Template" download target="_blank">
+                                                <i class="fas fa-file-download"></i>
+                                            </a>
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <!-- Actions -->
-                                        <div style="display:flex;">
 
-                                            <!-- Download Template if available -->
-                                            <?php if ($doc['template_path']): ?>
-                                                    <a href="<?php echo htmlspecialchars($doc['template_path']); ?>"
-                                                        class="action-btn download" title="Download Template" download target="_blank">
-                                                        <i class="fas fa-file-download"></i>
-                                                    </a>
-                                            <?php endif; ?>
+                                        <!-- View Submission if exists -->
+                                        <?php if ($doc['file_path']): ?>
+                                            <button class="action-btn view"
+                                                onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)"
+                                                title="View Submission">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        <?php endif; ?>
 
-                                            <!-- View Submission if exists -->
-                                            <?php if ($doc['file_path']): ?>
-                                                    <button class="action-btn view"
-                                                        onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)"
-                                                        title="View Submission">
-                                                        <i class="fas fa-eye"></i>
-                                                    </button>
-                                            <?php endif; ?>
+                                        <!-- Upload button (if missing, revised, or rejected) -->
+                                        <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
+                                            <button class="action-btn upload"
+                                                onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)"
+                                                title="Upload Document">
+                                                <i class="fas fa-upload"></i>
+                                            </button>
+                                        <?php endif; ?>
 
-                                            <!-- Upload button (if missing, revised, or rejected) -->
-                                            <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
-                                                    <button class="action-btn upload"
-                                                        onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)"
-                                                        title="Upload Document">
-                                                        <i class="fas fa-upload"></i>
-                                                    </button>
-                                            <?php endif; ?>
+                                        <!-- Reupload button (if document has been submitted and is pending or approved) -->
+                                        <?php if ($doc['file_path'] && in_array($doc['status'], ['pending'])): ?>
+                                            <button class="action-btn reupload"
+                                                onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)"
+                                                title="Reupload Document">
+                                                <i class="fas fa-redo-alt"></i>
+                                            </button>
+                                        <?php endif; ?>
 
-                                            <!-- Reupload button (if document has been submitted and is pending or approved) -->
-                                            <?php if ($doc['file_path'] && in_array($doc['status'], ['pending', 'approved'])): ?>
-                                                    <button class="action-btn reupload"
-                                                        onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)"
-                                                        title="Reupload Document">
-                                                        <i class="fas fa-redo-alt"></i>
-                                                    </button>
-                                            <?php endif; ?>
-
-                                        </div>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </td>
+                            </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -973,7 +982,7 @@ $documents = $studentService->getStudentDocuments($userId);
             <!-- Mobile Card Layout -->
             <div class="document-cards-container" id="documentCardsContainer">
                 <?php if (empty($documents)): ?>
-                        <div style="text-align:center; color:#888; padding: 2rem;">No document requirements found.</div>
+                    <div style="text-align:center; color:#888; padding: 2rem;">No document requirements found.</div>
                 <?php endif; ?>
 
                 <?php foreach ($documents as $doc):
@@ -1004,83 +1013,83 @@ $documents = $studentService->getStudentDocuments($userId);
                         }
                     }
                     ?>
-                        <div class="document-card" data-status="<?php echo strtolower($status); ?>"
-                            data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
+                    <div class="document-card" data-status="<?php echo strtolower($status); ?>"
+                        data-prereq="<?php echo $isPreReq ? 'true' : 'false'; ?>">
 
-                            <!-- Card Header -->
-                            <div class="document-card-header">
-                                <div>
-                                    <div class="document-card-title">
-                                        <i class="fas fa-file-alt"></i>
-                                        <?php echo htmlspecialchars($doc['name']); ?>
-                                        <?php if ($isPreReq): ?>
-                                                <span class="pre-req-badge">Required</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="document-card-code"><?php echo htmlspecialchars($doc['code']); ?></div>
+                        <!-- Card Header -->
+                        <div class="document-card-header">
+                            <div>
+                                <div class="document-card-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    <?php echo htmlspecialchars($doc['name']); ?>
+                                    <?php if ($isPreReq): ?>
+                                        <span class="pre-req-badge">Required</span>
+                                    <?php endif; ?>
                                 </div>
-                                <span class="status <?php echo $statusClass; ?>"><?php echo ucfirst($status); ?></span>
+                                <div class="document-card-code"><?php echo htmlspecialchars($doc['code']); ?></div>
                             </div>
+                            <span class="status <?php echo $statusClass; ?>"><?php echo ucfirst($status); ?></span>
+                        </div>
 
-                            <!-- Card Body -->
-                            <div class="document-card-body">
-                                <div class="document-card-item">
-                                    <span class="document-card-label">Category</span>
-                                    <span class="document-card-value" style="text-transform: capitalize;">
-                                        <?php echo str_replace('_', ' ', $doc['category']); ?>
-                                    </span>
-                                </div>
-                                <div class="document-card-item">
-                                    <span class="document-card-label">Deadline</span>
-                                    <span class="document-card-value" style="<?php echo $deadlineStyle; ?>">
-                                        <?php echo $deadlineDisplay; ?>
-                                    </span>
-                                </div>
+                        <!-- Card Body -->
+                        <div class="document-card-body">
+                            <div class="document-card-item">
+                                <span class="document-card-label">Category</span>
+                                <span class="document-card-value" style="text-transform: capitalize;">
+                                    <?php echo str_replace('_', ' ', $doc['category']); ?>
+                                </span>
                             </div>
-
-                            <!-- Feedback (if any) -->
-                            <?php if ($doc['feedback']): ?>
-                                    <div class="document-card-feedback">
-                                        <div class="document-card-feedback-label">
-                                            <i class="fas fa-comment-alt"></i> Feedback
-                                        </div>
-                                        <div class="document-card-feedback-text">
-                                            <?php echo htmlspecialchars($doc['feedback']); ?>
-                                        </div>
-                                    </div>
-                            <?php endif; ?>
-
-                            <!-- Card Actions -->
-                            <div class="document-card-actions">
-                                <?php if ($doc['template_path']): ?>
-                                        <a href="<?php echo htmlspecialchars($doc['template_path']); ?>" class="action-btn download"
-                                            download target="_blank">
-                                            <i class="fas fa-file-download"></i> Template
-                                        </a>
-                                <?php endif; ?>
-
-                                <?php if ($doc['file_path']): ?>
-                                        <button class="action-btn view"
-                                            onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)">
-                                            <i class="fas fa-eye"></i> View
-                                        </button>
-                                <?php endif; ?>
-
-                                <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
-                                        <button class="action-btn upload"
-                                            onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)">
-                                            <i class="fas fa-upload"></i> Upload
-                                        </button>
-                                <?php endif; ?>
-
-                                <?php if ($doc['file_path'] && in_array($doc['status'], ['pending', 'approved'])): ?>
-                                        <button class="action-btn reupload"
-                                            onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)">
-                                            <i class="fas fa-redo-alt"></i> Reupload
-                                        </button>
-                                <?php endif; ?>
+                            <div class="document-card-item">
+                                <span class="document-card-label">Deadline</span>
+                                <span class="document-card-value" style="<?php echo $deadlineStyle; ?>">
+                                    <?php echo $deadlineDisplay; ?>
+                                </span>
                             </div>
                         </div>
+
+                        <!-- Feedback (if any) -->
+                        <?php if ($doc['feedback'] && strtolower($status) !== 'approved'): ?>
+                            <div class="document-card-feedback">
+                                <div class="document-card-feedback-label">
+                                    <i class="fas fa-comment-alt"></i> Feedback
+                                </div>
+                                <div class="document-card-feedback-text">
+                                    <?php echo htmlspecialchars($doc['feedback']); ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Card Actions -->
+                        <div class="document-card-actions">
+                            <?php if ($doc['template_path']): ?>
+                                <a href="<?php echo htmlspecialchars($doc['template_path']); ?>" class="action-btn download"
+                                    download target="_blank">
+                                    <i class="fas fa-file-download"></i> Template
+                                </a>
+                            <?php endif; ?>
+
+                            <?php if ($doc['file_path']): ?>
+                                <button class="action-btn view"
+                                    onclick="viewDocument(<?php echo htmlspecialchars(json_encode($doc['file_path']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>)">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                            <?php endif; ?>
+
+                            <?php if (!$doc['status'] || in_array($doc['status'], ['revise', 'rejected', 'missing'])): ?>
+                                <button class="action-btn upload"
+                                    onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, false)">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                            <?php endif; ?>
+
+                            <?php if ($doc['file_path'] && in_array($doc['status'], ['pending'])): ?>
+                                <button class="action-btn reupload"
+                                    onclick="openUploadModal(<?php echo $doc['document_type_id']; ?>, <?php echo htmlspecialchars(json_encode($doc['name']), ENT_QUOTES); ?>, true)">
+                                    <i class="fas fa-redo-alt"></i> Reupload
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 <?php endforeach; ?>
             </div>
         </div>

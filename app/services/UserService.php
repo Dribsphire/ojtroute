@@ -1090,15 +1090,6 @@ class UserService
                 ];
             }
 
-            // Prevent deleting admin users
-            if ($user['role'] === 'admin') {
-                $this->db->rollBack();
-                return [
-                    'success' => false,
-                    'message' => 'Cannot delete admin users'
-                ];
-            }
-
             $schoolId = $user['school_id'];
 
             // Delete related records based on role

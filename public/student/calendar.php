@@ -69,16 +69,8 @@ try {
         if (!isset($attendance[$date])) {
             $attendance[$date] = [
                 'status' => 'present', // If there's any record, mark as present
-                'blocks' => [
-                    'morning' => null,
-                    'afternoon' => null,
-                    'overtime' => null
-                ],
-                'details' => [
-                    'morning' => null,
-                    'afternoon' => null,
-                    'overtime' => null
-                ]
+                'blocks' => [],
+                'details' => []
             ];
         }
 
@@ -169,6 +161,7 @@ try {
             s.section_name,
             sw.company_name,
             sw.company_head,
+            sw.schedule_start_time,
             COALESCE(os.manual_adjustment_hours, 0) as manual_hours
         FROM students st
         JOIN users u ON st.user_id = u.id
@@ -207,6 +200,21 @@ try {
     $allExcusedDates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     error_log('Excused dates fetch error for DTR: ' . $e->getMessage());
+}
+
+// Fetch double hours dates for the selected month
+$doubleHoursDates = [];
+try {
+    if (!isset($db)) {
+        $config = require __DIR__ . '/../../config/database.php';
+        $dsn = sprintf("mysql:host=%s;dbname=%s;charset=%s", $config['host'], $config['dbname'], $config['charset']);
+        $db = new PDO($dsn, $config['username'], $config['password'], $config['options']);
+    }
+    $stmt = $db->prepare("SELECT date FROM double_hours_dates WHERE date BETWEEN ? AND ?");
+    $stmt->execute([$startDate, $endDate]);
+    $doubleHoursDates = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'date');
+} catch (Exception $e) {
+    error_log('Double hours dates fetch error: ' . $e->getMessage());
 }
 
 ?>
@@ -327,6 +335,7 @@ try {
         }
 
         .calendar-day {
+            position: relative;
             aspect-ratio: 2;
             display: flex;
             flex-direction: column;
@@ -343,6 +352,17 @@ try {
             font-size: 0.65rem;
             line-height: 1;
             margin-top: 2px;
+        }
+
+        .dh-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-size: 0.60rem;
+            font-weight: 800;
+            color: #f59e0b;
+            line-height: 1;
+            pointer-events: none;
         }
 
         .present {
@@ -444,7 +464,7 @@ try {
 
         .block-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
         }
 
@@ -474,6 +494,29 @@ try {
 
         .block-img-wrap {
             padding: .75rem 1rem 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .late-badge {
+            position: absolute;
+            bottom: 0.5rem;
+            left: 0.5rem;
+            background: rgba(220, 38, 38, 0.88);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            pointer-events: none;
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .late-badge::before {
+            font-size: 0.7rem;
         }
 
         .block-img {
@@ -596,7 +639,7 @@ try {
         @media (max-width: 480px) {
             .calendar-card {
                 padding: 0.75rem;
-                height: 34rem;
+                height: auto;
                 width: 19rem;
                 margin: 0 auto;
             }
@@ -630,7 +673,8 @@ try {
 
             .calendar-day {
                 font-size: 0.65rem;
-                min-height: 16px;
+                aspect-ratio: 1;
+                min-height: 20px;
                 padding: 0.03rem;
             }
 
@@ -716,10 +760,8 @@ try {
                         if ($isPresent || $isExcused)
                             $classes .= ' clickable';
 
-                        $blocks = isset($attendance[$dateKey]) ? $attendance[$dateKey]['blocks'] : ['morning' => null, 'afternoon' => null, 'overtime' => null];
-                        $m = $blocks['morning'] ?? null;
-                        $a = $blocks['afternoon'] ?? null;
-                        $o = $blocks['overtime'] ?? null;
+                        $blocks = isset($attendance[$dateKey]) ? $attendance[$dateKey]['blocks'] : [];
+                        $details = isset($attendance[$dateKey]) ? $attendance[$dateKey]['details'] : [];
 
                         // Get excuse data if available
                         $excuseReason = isset($attendance[$dateKey]['excuse_reason']) ? $attendance[$dateKey]['excuse_reason'] : '';
@@ -728,13 +770,18 @@ try {
                         echo '<div class="' . htmlspecialchars($classes) . '"'
                             . ' data-date="' . htmlspecialchars($dateKey) . '"'
                             . ' data-status="' . htmlspecialchars((string) $status) . '"'
-                            . ' data-morning="' . htmlspecialchars((string) $m) . '"'
-                            . ' data-afternoon="' . htmlspecialchars((string) $a) . '"'
-                            . ' data-overtime="' . htmlspecialchars((string) $o) . '"'
+                            . ' data-blocks="' . htmlspecialchars(json_encode($blocks)) . '"'
+                            . ' data-details="' . htmlspecialchars(json_encode($details)) . '"'
                             . ' data-excuse-reason="' . htmlspecialchars($excuseReason) . '"'
                             . ' data-excuse-hours="' . htmlspecialchars((string) $excuseHours) . '"'
                             . ' data-has-excuse="' . ($hasExcuse ? 'true' : 'false') . '"'
                             . ' role="gridcell" tabindex="0">';
+
+                        $isDoubleHours = in_array($dateKey, $doubleHoursDates);
+
+                        if ($isDoubleHours) {
+                            echo '<span class="dh-badge" title="Double Hours">2X</span>';
+                        }
 
                         if ($status === 'present') {
                             echo (int) $day . '<br><small>Present</small>';
@@ -756,6 +803,9 @@ try {
                     <div class="legend-item"><span class="legend-box excused"></span><span>Excused</span></div>
                     <div class="legend-item"><span style="color: #4da6ff; font-size: 1.1rem;">★</span><span> Present &
                             Excuse </span></div>
+                    <div class="legend-item"><span
+                            style="color: #f59e0b; font-weight: 800; font-size: 0.85rem;">2×</span><span>Double
+                            Hours</span></div>
                 </div>
             </div>
         </div>
@@ -771,25 +821,8 @@ try {
                 </button>
             </div>
             <div class="modal-body">
-                <div class="block-grid">
-                    <div class="block-card">
-                        <h4>Morning Attendance</h4>
-                        <div class="block-img-wrap" id="morningWrap"></div>
-                        <div class="block-details" id="morningDetails"
-                            style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--secondary-text-clr);"></div>
-                    </div>
-                    <div class="block-card">
-                        <h4>Afternoon Attendance</h4>
-                        <div class="block-img-wrap" id="afternoonWrap"></div>
-                        <div class="block-details" id="afternoonDetails"
-                            style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--secondary-text-clr);"></div>
-                    </div>
-                    <div class="block-card">
-                        <h4>Overtime Attendance</h4>
-                        <div class="block-img-wrap" id="overtimeWrap"></div>
-                        <div class="block-details" id="overtimeDetails"
-                            style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--secondary-text-clr);"></div>
-                    </div>
+                <div class="block-grid" id="blockGridContainer">
+                    <!-- Block cards are dynamically generated by JavaScript -->
                 </div>
             </div>
         </div>
@@ -880,17 +913,20 @@ try {
             return img;
         }
 
+        const blockLabels = {
+            'regular': 'Regular Hours',
+            'overtime': 'Overtime',
+            'morning': 'Morning Attendance',
+            'afternoon': 'Afternoon Attendance'
+        };
+
         function openAttendancePhotos(dateKey, blocks, details) {
             const title = document.getElementById('attendanceModalTitle');
             if (title) title.textContent = `Attendance Details - ${dateKey}`;
 
-            const morningWrap = document.getElementById('morningWrap');
-            const afternoonWrap = document.getElementById('afternoonWrap');
-            const overtimeWrap = document.getElementById('overtimeWrap');
-
-            const morningDetails = document.getElementById('morningDetails');
-            const afternoonDetails = document.getElementById('afternoonDetails');
-            const overtimeDetails = document.getElementById('overtimeDetails');
+            const container = document.getElementById('blockGridContainer');
+            if (!container) return;
+            container.innerHTML = '';
 
             // Helper function to format time details
             function formatDetails(blockDetails) {
@@ -898,7 +934,6 @@ try {
 
                 const timeIn = blockDetails.time_in ? new Date(blockDetails.time_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
                 const timeOut = blockDetails.time_out ? new Date(blockDetails.time_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
-                // CRITICAL FIX: Use safe parsing to prevent NaN/Infinity crashes
                 const hours = blockDetails.hours ? formatHours(blockDetails.hours, 2) : '-';
                 const status = blockDetails.status || '-';
 
@@ -912,13 +947,61 @@ try {
                 `;
             }
 
-            if (morningWrap) morningWrap.replaceChildren(createImageOrPlaceholder(blocks.morning));
-            if (afternoonWrap) afternoonWrap.replaceChildren(createImageOrPlaceholder(blocks.afternoon));
-            if (overtimeWrap) overtimeWrap.replaceChildren(createImageOrPlaceholder(blocks.overtime));
+            // Determine which blocks to show
+            const blockTypes = Object.keys(blocks || {}).length > 0 ? Object.keys(blocks) : (Object.keys(details || {}).length > 0 ? Object.keys(details) : ['regular', 'overtime']);
 
-            if (morningDetails) morningDetails.innerHTML = formatDetails(details?.morning);
-            if (afternoonDetails) afternoonDetails.innerHTML = formatDetails(details?.afternoon);
-            if (overtimeDetails) overtimeDetails.innerHTML = formatDetails(details?.overtime);
+            // Create a card for each block
+            const uniqueBlocks = [...new Set(blockTypes)];
+            uniqueBlocks.forEach(blockType => {
+                const card = document.createElement('div');
+                card.className = 'block-card';
+
+                const label = blockLabels[blockType] || (blockType.charAt(0).toUpperCase() + blockType.slice(1) + ' Attendance');
+                const h4 = document.createElement('h4');
+                h4.textContent = label;
+                card.appendChild(h4);
+
+                const imgWrap = document.createElement('div');
+                imgWrap.className = 'block-img-wrap';
+                imgWrap.appendChild(createImageOrPlaceholder(blocks ? blocks[blockType] : null));
+                card.appendChild(imgWrap);
+
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'block-details';
+                detailsDiv.style.cssText = 'padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--secondary-text-clr);';
+                detailsDiv.innerHTML = formatDetails(details ? details[blockType] : null);
+                card.appendChild(detailsDiv);
+
+                // --- Late badge logic ---
+                const blockDetails = details ? details[blockType] : null;
+                let lateMinutes = 0;
+                if (blockDetails && blockDetails.time_in && studentInfo.schedule_start_time) {
+                    // Only check lateness for the first block of the day (regular / morning)
+                    if (blockType === 'regular' || blockType === 'morning') {
+                        try {
+                            const dateStr = (blockDetails.time_in || '').split('T')[0].split(' ')[0];
+                            const schedStart = new Date(dateStr + 'T' + studentInfo.schedule_start_time);
+                            const timeInDate = new Date(blockDetails.time_in);
+                            const diffMs = timeInDate - schedStart;
+                            if (diffMs > 60000) lateMinutes = Math.round(diffMs / 60000);
+                        } catch (e) { }
+                    }
+                }
+
+                if (lateMinutes > 0) {
+                    const badge = document.createElement('div');
+                    badge.className = 'late-badge';
+                    const hrs = Math.floor(lateMinutes / 60);
+                    const mins = lateMinutes % 60;
+                    badge.textContent = hrs > 0
+                        ? `Late ${hrs}h ${mins}m`
+                        : `Late ${mins} min`;
+                    imgWrap.appendChild(badge);
+                }
+                // --- end late badge ---
+
+                container.appendChild(card);
+            });
 
             openModal('attendanceModal');
         }
@@ -952,34 +1035,28 @@ try {
                     const title = document.getElementById('attendanceModalTitle');
                     if (title) title.textContent = `Excused Absence - ${dateKey}`;
 
-                    // Clear all blocks
-                    const morningWrap = document.getElementById('morningWrap');
-                    const afternoonWrap = document.getElementById('afternoonWrap');
-                    const overtimeWrap = document.getElementById('overtimeWrap');
-                    const morningDetails = document.getElementById('morningDetails');
-                    const afternoonDetails = document.getElementById('afternoonDetails');
-                    const overtimeDetails = document.getElementById('overtimeDetails');
-
-                    if (morningWrap) morningWrap.innerHTML = '<div class="no-photo">Excused Absence</div>';
-                    if (afternoonWrap) afternoonWrap.innerHTML = '<div class="no-photo">Excused Absence</div>';
-                    if (overtimeWrap) overtimeWrap.innerHTML = '<div class="no-photo">Excused Absence</div>';
-
-                    const excuseInfo = `
-                        <div style="line-height: 1.8; background: rgba(77, 166, 255, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(77, 166, 255, 0.3);">
-                            <div style="font-size: 1rem; margin-bottom: 0.75rem; color: #4da6ff; font-weight: 600;">
-                                <i class="fas fa-calendar-check"></i> Excused by Instructor
+                    // Clear container for excuse view
+                    const container = document.getElementById('blockGridContainer');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="block-card">
+                                <h4>Excused Absence</h4>
+                                <div class="block-img-wrap"><div class="no-photo">Excused Absence</div></div>
+                                <div class="block-details" style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--secondary-text-clr);">
+                                    <div style="line-height: 1.8; background: rgba(77, 166, 255, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(77, 166, 255, 0.3);">
+                                        <div style="font-size: 1rem; margin-bottom: 0.75rem; color: #4da6ff; font-weight: 600;">
+                                            <i class="fas fa-calendar-check"></i> Excused by Instructor
+                                        </div>
+                                        <div><strong>Hours Credited:</strong> ${formatHours(excuseHours, 2)} hours</div>
+                                        <div><strong>Reason:</strong> ${excuseReason}</div>
+                                        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--secondary-text-clr);">
+                                            <i class="fas fa-info-circle"></i> This absence was approved and hours were automatically credited to your OJT record.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div><strong>Hours Credited:</strong> ${formatHours(excuseHours, 2)} hours</div>
-                            <div><strong>Reason:</strong> ${excuseReason}</div>
-                            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--secondary-text-clr);">
-                                <i class="fas fa-info-circle"></i> This absence was approved and hours were automatically credited to your OJT record.
-                            </div>
-                        </div>
-                    `;
-
-                    if (morningDetails) morningDetails.innerHTML = excuseInfo;
-                    if (afternoonDetails) afternoonDetails.innerHTML = '';
-                    if (overtimeDetails) overtimeDetails.innerHTML = '';
+                        `;
+                    }
 
                     openModal('attendanceModal');
                 } else if (status === 'present') {
@@ -998,13 +1075,13 @@ try {
 
                         openAttendancePhotos(
                             dateKey,
-                            row.blocks || { morning: null, afternoon: null, overtime: null },
-                            row.details || { morning: null, afternoon: null, overtime: null }
+                            row.blocks || {},
+                            row.details || {}
                         );
 
-                        // Add excuse banner at the top of morning details
-                        const morningDetails = document.getElementById('morningDetails');
-                        if (morningDetails) {
+                        // Add excuse banner at the top of the first block details
+                        const firstDetails = document.querySelector('#blockGridContainer .block-details');
+                        if (firstDetails) {
                             const excuseBanner = `
                                 <div style="line-height: 1.6; background: rgba(77, 166, 255, 0.15); padding: 0.75rem; border-radius: 6px; border: 1px solid rgba(77, 166, 255, 0.4); margin-bottom: 0.75rem;">
                                     <div style="font-size: 0.9rem; color: #4da6ff; font-weight: 600; margin-bottom: 0.25rem;">
@@ -1014,14 +1091,14 @@ try {
                                     <div style="font-size: 0.85rem;"><strong>Reason:</strong> ${excuseReason}</div>
                                 </div>
                             `;
-                            morningDetails.innerHTML = excuseBanner + morningDetails.innerHTML;
+                            firstDetails.innerHTML = excuseBanner + firstDetails.innerHTML;
                         }
                     } else {
                         // Regular attendance without excuse
                         openAttendancePhotos(
                             dateKey,
-                            row.blocks || { morning: null, afternoon: null, overtime: null },
-                            row.details || { morning: null, afternoon: null, overtime: null }
+                            row.blocks || {},
+                            row.details || {}
                         );
                     }
                 }
@@ -1089,7 +1166,17 @@ try {
                     totalHours += hours;
                 } else if (item && item.details) {
                     // Regular attendance processing (only if not excused)
-                    // Morning block - only completed/approved
+                    // Handle 'regular' block type (new system)
+                    if (item.details.regular && (item.details.regular.status === 'completed' || item.details.regular.status === 'approved')) {
+                        const regular = item.details.regular;
+                        dateRecords[day].amIn = regular.time_in ? new Date(regular.time_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+                        dateRecords[day].amOut = regular.time_out ? new Date(regular.time_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+                        const hours = regular.hours ? safeParseHours(regular.hours, 12) : 0;
+                        dateRecords[day].dailyHours += hours;
+                        totalHours += hours;
+                    }
+
+                    // Handle legacy 'morning' block type (old system)
                     if (item.details.morning && (item.details.morning.status === 'completed' || item.details.morning.status === 'approved')) {
                         const morning = item.details.morning;
                         dateRecords[day].amIn = morning.time_in ? new Date(morning.time_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
@@ -1099,7 +1186,7 @@ try {
                         totalHours += hours;
                     }
 
-                    // Afternoon block - only completed/approved
+                    // Handle legacy 'afternoon' block type (old system)
                     if (item.details.afternoon && (item.details.afternoon.status === 'completed' || item.details.afternoon.status === 'approved')) {
                         const afternoon = item.details.afternoon;
                         dateRecords[day].pmIn = afternoon.time_in ? new Date(afternoon.time_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
@@ -1109,7 +1196,7 @@ try {
                         totalHours += hours;
                     }
 
-                    // Overtime block - only completed/approved
+                    // Overtime block - only completed/approved (works for both old and new)
                     if (item.details.overtime && (item.details.overtime.status === 'completed' || item.details.overtime.status === 'approved')) {
                         const overtime = item.details.overtime;
                         dateRecords[day].otIn = overtime.time_in ? new Date(overtime.time_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
@@ -1132,7 +1219,6 @@ try {
                         <tr style="background-color: #e6f3ff;">
                             <td>${day}</td>
                             <td colspan="2" style="text-align: center;">Excused</td>
-                            <td colspan="2" style="text-align: center;">Excused</td>
                             <td>${record.otIn}</td>
                             <td>${record.otOut}</td>
                             <td>${record.dailyHours > 0 ? record.dailyHours.toFixed(2) : ''}</td>
@@ -1140,14 +1226,14 @@ try {
                         </tr>
                     `;
                 } else {
-                    // Regular attendance row
+                    // Regular attendance row - combine AM (regular/morning) into TIME IN/OUT
+                    const timeIn = record.amIn || '';
+                    const timeOut = record.amOut || record.pmOut || '';
                     dtrRows += `
                         <tr>
                             <td>${day}</td>
-                            <td>${record.amIn}</td>
-                            <td>${record.amOut}</td>
-                            <td>${record.pmIn}</td>
-                            <td>${record.pmOut}</td>
+                            <td>${timeIn}</td>
+                            <td>${timeOut}</td>
                             <td>${record.otIn}</td>
                             <td>${record.otOut}</td>
                             <td>${record.dailyHours > 0 ? record.dailyHours.toFixed(2) : ''}</td>
@@ -1232,17 +1318,14 @@ try {
                             <thead>
                                 <tr>
                                     <th rowspan="2">DATE</th>
-                                    <th colspan="2" class="header-group">AM</th>
-                                    <th colspan="2" class="header-group">PM</th>
+                                    <th colspan="2" class="header-group">TIME IN / OUT</th>
                                     <th colspan="2" class="header-group">OVERTIME</th>
                                     <th rowspan="2">TOTAL<br>DUTY<br>HOURS</th>
                                     <th rowspan="2">REMARKS</th>
                                 </tr>
                                 <tr>
-                                    <th>AM IN</th>
-                                    <th>AM OUT</th>
-                                    <th>PM IN</th>
-                                    <th>PM OUT</th>
+                                    <th>TIME IN</th>
+                                    <th>TIME OUT</th>
                                     <th>OT IN</th>
                                     <th>OT OUT</th>
                                 </tr>
@@ -1252,7 +1335,7 @@ try {
                             </tbody>
                             <tfoot>
                                 <tr class="total-row">
-                                    <td colspan="7">TOTAL HOURS</td>
+                                    <td colspan="5">TOTAL HOURS</td>
                                     <td>${totalHours.toFixed(2)}</td>
                                     <td></td>
                                 </tr>

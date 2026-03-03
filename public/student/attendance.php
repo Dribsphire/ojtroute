@@ -26,6 +26,20 @@ $eligibility = $studentService->checkAttendanceEligibility($dbId);
 $isAllowed = $eligibility['allowed'];
 $blockMessage = $isAllowed ? '' : $eligibility['message'];
 
+// Get student schedule
+$schedule = $studentService->getStudentSchedule($dbId);
+$hasSchedule = !empty($schedule);
+$scheduleStart = $hasSchedule ? $schedule['schedule_start_time'] : null;
+$scheduleEnd = $hasSchedule ? $schedule['schedule_end_time'] : null;
+
+// Calculate overtime end (schedule_end + 4 hours)
+$overtimeEnd = null;
+if ($hasSchedule) {
+    $otEndDt = new DateTime($scheduleEnd);
+    $otEndDt->modify('+4 hours');
+    $overtimeEnd = $otEndDt->format('H:i:s');
+}
+
 // Handle POST Requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Clean buffer
@@ -65,12 +79,9 @@ foreach ($todayAttendance as $record) {
         'request_status' => $record['request_status'] ?? null
     ];
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance - OJT TrainTrack</title>
@@ -124,41 +135,46 @@ foreach ($todayAttendance as $record) {
             </div>
 
             <div class="attendance-blocks">
-                <!-- Morning Block -->
-                <div class="attendance-block">
-                    <div class="block-header">
-                        <h3>Morning Block</h3>
-                        <span class="status-badge not-started">Not Started</span>
+                <?php if (!$hasSchedule): ?>
+                    <div class="attendance-block" style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                        <i class="fas fa-calendar-alt" style="font-size: 2.5rem; color: #ffa500; margin-bottom: 1rem;"></i>
+                        <h3 style="color: #ffa500; margin-bottom: 0.5rem;">Working Schedule Not Set</h3>
+                        <p style="color: var(--secondary-text-clr); margin-bottom: 1rem;">You must set your working schedule
+                            in your profile before you can record attendance.</p>
+                        <a href="student_profile.php" class="btn btn-primary"
+                            style="display: inline-flex; text-decoration: none;">
+                            <i class="fas fa-user-cog"></i> Go to Profile
+                        </a>
                     </div>
-                    <p class="time-range">Time Range: 6:00 AM - 12:00 PM</p>
-                    <button class="time-in-btn" data-block="morning">
-                        <i class="fas fa-clock"></i> Time In
-                    </button>
-                </div>
+                <?php else: ?>
+                    <!-- Regular Hours Block -->
+                    <div class="attendance-block">
+                        <div class="block-header">
+                            <h3>Regular Hours</h3>
+                            <span class="status-badge not-started">Not Started</span>
+                        </div>
+                        <p class="time-range">Time Range: <?php echo date('g:i A', strtotime($scheduleStart)); ?> -
+                            <?php echo date('g:i A', strtotime($scheduleEnd)); ?>
+                        </p>
+                        <button class="time-in-btn" data-block="regular">
+                            <i class="fas fa-clock"></i> Time In
+                        </button>
+                    </div>
 
-                <!-- Afternoon Block -->
-                <div class="attendance-block">
-                    <div class="block-header">
-                        <h3>Afternoon Block</h3>
-                        <span class="status-badge not-started">Not Started</span>
+                    <!-- Overtime Block -->
+                    <div class="attendance-block">
+                        <div class="block-header">
+                            <h3>Overtime</h3>
+                            <span class="status-badge not-started">Not Started</span>
+                        </div>
+                        <p class="time-range">Time Range: <?php echo date('g:i A', strtotime($scheduleEnd)); ?> -
+                            <?php echo date('g:i A', strtotime($overtimeEnd)); ?>
+                        </p>
+                        <button class="time-in-btn" data-block="overtime">
+                            <i class="fas fa-clock"></i> Time In
+                        </button>
                     </div>
-                    <p class="time-range">Time Range: 12:00 PM - 6:00 PM</p>
-                    <button class="time-in-btn" data-block="afternoon">
-                        <i class="fas fa-clock"></i> Time In
-                    </button>
-                </div>
-
-                <!-- Overtime Block -->
-                <div class="attendance-block">
-                    <div class="block-header">
-                        <h3>Overtime Block</h3>
-                        <span class="status-badge not-started">Not Started</span>
-                    </div>
-                    <p class="time-range">Time Range: 6:00 PM - 10:00 PM</p>
-                    <button class="time-in-btn" data-block="overtime">
-                        <i class="fas fa-clock"></i> Time In
-                    </button>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </main>
@@ -256,7 +272,14 @@ foreach ($todayAttendance as $record) {
             position: relative;
         }
 
-        #cameraPreview,
+        #cameraPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            /* un-mirror front camera preview */
+        }
+
         #photoCanvas {
             width: 100%;
             height: 100%;
@@ -344,7 +367,7 @@ foreach ($todayAttendance as $record) {
 
         .attendance-blocks {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(25rem, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -547,7 +570,7 @@ foreach ($todayAttendance as $record) {
             }
 
             .map-container {
-                height: 10rem;
+                height: 15rem;
             }
 
             .attendance-block {
@@ -688,9 +711,13 @@ foreach ($todayAttendance as $record) {
             canvas.width = video.videoWidth * scale;
             canvas.height = video.videoHeight * scale;
 
-            // Draw current video frame to canvas (resized)
+            // Draw current video frame to canvas (resized), flipping horizontally to un-mirror
             const context = canvas.getContext('2d');
+            context.save();
+            context.translate(canvas.width, 0);
+            context.scale(-1, 1);
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            context.restore();
 
             // Convert canvas to JPEG with 60% quality for much smaller file size
             const imageDataUrl = canvas.toDataURL('image/jpeg', 0.6);
@@ -748,14 +775,7 @@ foreach ($todayAttendance as $record) {
 
                         debugBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating location...';
 
-                        // Validate Distance
-                        const dist = calculateDistance(lat, lng, workplaceLat, workplaceLng);
-                        if (dist > 60) {
-                            alert(`You are too far from your workplace (${Math.round(dist)}m).\nMaximum allowed distance is 60m.\nPlease move closer regarding the map location.`);
-                            debugBtn.innerHTML = '<i class="fas fa-check"></i> Submit Time In';
-                            debugBtn.disabled = false;
-                            return;
-                        }
+
 
                         debugBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
                         sendTimeInRequest(block, lat, lng, capturedPhotoData);
@@ -809,6 +829,12 @@ foreach ($todayAttendance as $record) {
                     document.getElementById('submitTimeIn').disabled = false;
 
                     if (data.success) {
+                        if (data.late_minutes && data.late_minutes > 0) {
+                            const hrs = Math.floor(data.late_minutes / 60);
+                            const mins = data.late_minutes % 60;
+                            const lateStr = hrs > 0 ? `${hrs} hour${hrs > 1 ? 's' : ''} and ${mins} minute${mins !== 1 ? 's' : ''}` : `${mins} minute${mins !== 1 ? 's' : ''}`;
+                            alert(`⚠️ You're late ${lateStr}!\n\nYour scheduled start time has already passed. Please try to arrive on time.`);
+                        }
                         alert(data.message);
                         closeCameraModal();
                         // Refresh the page to show updated status
@@ -1004,11 +1030,32 @@ foreach ($todayAttendance as $record) {
                 const [h, m, s] = timeString.split(':').map(Number);
                 const currentHour = h + (m / 60);
 
-                const blocks = {
-                    'morning': { start: 6, end: 12 },
-                    'afternoon': { start: 12, end: 18 },
-                    'overtime': { start: 18, end: 22 }
-                };
+                <?php if ($hasSchedule): ?>
+                    const scheduleStartParts = '<?php echo $scheduleStart; ?>'.split(':').map(Number);
+                    const scheduleEndParts = '<?php echo $scheduleEnd; ?>'.split(':').map(Number);
+                    const scheduleStartHour = scheduleStartParts[0] + (scheduleStartParts[1] / 60);
+                    const scheduleEndHour = scheduleEndParts[0] + (scheduleEndParts[1] / 60);
+                    const overtimeEndHour = scheduleEndHour + 4;
+                    const earlyStartHour = scheduleStartHour - 0.5; // 30 min before schedule start
+                    
+                    // Detect if this is a cross-day shift (end time < start time)
+                    const isCrossDayShift = scheduleEndHour < scheduleStartHour;
+                    
+                    const blocks = {
+                        'regular': { 
+                            start: earlyStartHour, 
+                            end: scheduleEndHour,
+                            isCrossDay: isCrossDayShift
+                        },
+                        'overtime': { 
+                            start: scheduleEndHour, 
+                            end: overtimeEndHour,
+                            isCrossDay: isCrossDayShift
+                        }
+                    };
+                <?php else: ?>
+                    const blocks = {};
+                <?php endif; ?>
 
                 for (const [block, range] of Object.entries(blocks)) {
                     const btn = document.querySelector(`.time-in-btn[data-block="${block}"]`);
@@ -1055,27 +1102,20 @@ foreach ($todayAttendance as $record) {
                             btn.style.cursor = 'default';
                             updateStatusBadge(btn, 'Completed', 'completed');
                         } else {
-                            // Ongoing - check if block has ended
-                            if (currentHour > range.end) {
-                                // Block has ended - cannot time out anymore
-                                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Block Ended - Cannot Time Out';
-                                btn.style.background = '#ff6b6b';
-                                btn.disabled = true;
-                                btn.style.cursor = 'default';
-                                updateStatusBadge(btn, 'Block Ended', 'missing-timeout');
-                            } else {
-                                // Block still active - show Time Out button
-                                btn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Time Out';
-                                btn.style.background = '#dc3545';
-                                btn.disabled = false;
-                                btn.style.cursor = 'pointer';
-                                btn.setAttribute('data-action', 'time_out');
-                                updateStatusBadge(btn, 'In Progress', 'in-progress');
-                            }
+                            // Ongoing - show Time Out button
+                            btn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Time Out';
+                            btn.style.background = '#dc3545';
+                            btn.disabled = false;
+                            btn.style.cursor = 'pointer';
+                            btn.setAttribute('data-action', 'time_out');
+                            updateStatusBadge(btn, 'In Progress', 'in-progress');
                         }
                     } else {
                         // No record - Standard Time In Logic
                         btn.setAttribute('data-action', 'time_in');
+                        
+                        // Reset status badge to "Not Started" when no record exists for today
+                        updateStatusBadge(btn, 'Not Started', 'not-started');
 
                         // If manually disabled by eligibility check
                         if (document.querySelector('.alert-banner')) {
@@ -1083,12 +1123,48 @@ foreach ($todayAttendance as $record) {
                             continue;
                         }
 
-                        if (currentHour > range.end) {
+                        // Handle cross-day shift logic
+                        let isWithinTimeRange = false;
+                        let isTimeEnded = false;
+                        
+                        if (range.isCrossDay) {
+                            // For cross-day shifts (e.g., 21:00 to 06:00)
+                            if (block === 'regular') {
+                                // Regular block: from early start to midnight, then from midnight to end time
+                                if (currentHour >= range.start || currentHour < range.end) {
+                                    isWithinTimeRange = true;
+                                }
+                                // Block ends only when we pass the end time AND we're in the "ended window" (after end time but before start time on the same day cycle)
+                                // For cross-day, this means after 6:00 AM but before 8:30 PM
+                                if (currentHour >= range.end && currentHour < range.start && currentHour > 12) {
+                                    isTimeEnded = true;
+                                }
+                            } else if (block === 'overtime') {
+                                // Overtime block: from schedule end to midnight, then from midnight to overtime end
+                                // For cross-day shifts, overtime starts at 6:00 AM (schedule end) and goes to 10:00 AM
+                                if (currentHour >= range.start && currentHour < range.end) {
+                                    isWithinTimeRange = true;
+                                }
+                                // Overtime ends when we pass the overtime end time (after 10:00 AM)
+                                if (currentHour >= range.end) {
+                                    isTimeEnded = true;
+                                }
+                            }
+                        } else {
+                            // Regular same-day logic
+                            if (currentHour > range.end) {
+                                isTimeEnded = true;
+                            } else if (currentHour >= range.start) {
+                                isWithinTimeRange = true;
+                            }
+                        }
+
+                        if (isTimeEnded) {
                             btn.disabled = true;
                             btn.innerHTML = '<i class="fas fa-ban"></i> Ended';
                             btn.style.background = '#6c757d';
                             btn.style.cursor = 'not-allowed';
-                        } else if (currentHour < range.start) {
+                        } else if (!isWithinTimeRange) {
                             btn.disabled = true;
                             btn.innerHTML = '<i class="fas fa-clock"></i> Not Started';
                             btn.style.background = '#6c757d';
@@ -1126,11 +1202,6 @@ foreach ($todayAttendance as $record) {
                     if (action === 'time_out') {
                         submitTimeOut(block);
                     } else {
-                        // Check distance before opening camera
-                        if (currentDistance > 60) {
-                            alert(`You are too far from your workplace (${Math.round(currentDistance)}m).\nPlease move closer (within 60m) to Time In.`);
-                            return;
-                        }
                         openCameraModal(block);
                     }
                 });
@@ -1149,9 +1220,10 @@ foreach ($todayAttendance as $record) {
                         if (data.success) {
                             // Format block name for display
                             const blockNames = {
+                                'regular': 'Regular Hours',
+                                'overtime': 'Overtime',
                                 'morning': 'Morning Block',
-                                'afternoon': 'Afternoon Block',
-                                'overtime': 'Overtime Block'
+                                'afternoon': 'Afternoon Block'
                             };
                             const blockName = blockNames[block] || block;
 

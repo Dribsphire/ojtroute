@@ -742,10 +742,8 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                                 <th>Date</th>
                                 <th>Block Type</th>
                                 <th>Time In</th>
-                                <th>Document</th>
-                                <th>Reason</th>
+                                <th>Est. Hours</th>
                                 <th>Status</th>
-                                <th>Instructor Response</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -791,8 +789,9 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                             </div>
                             <div class="field" style="grid-column: 1 / -1;">
                                 <label for="letterFile">Upload Letter / Supporting Document</label>
-                                <input id="letterFile" name="letter" type="file" accept=".pdf,image/*">
-                                <span class="muted" style="font-size: .85rem;">Accepted: PDF or Image</span>
+                                <input id="letterFile" name="letter" type="file" accept=".pdf,.doc,.docx,image/*">
+                                <span class="muted" style="font-size: .85rem;">Accepted: PDF, Word (.doc, .docx), or
+                                    Image</span>
                             </div>
                         </div>
 
@@ -818,6 +817,18 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                     </button>
                 </div>
                 <div class="modal-body">
+                    <div id="previewInfoSection"
+                        style="padding: 0.75rem; margin-bottom: 0.75rem; border: 1px solid var(--line-clr); border-radius: 0.75em; background: rgba(255,255,255,0.02);">
+                        <div
+                            style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                            <div><strong style="color: var(--accent-clr);">Your Reason:</strong> <span
+                                    id="previewReason" class="muted">-</span></div>
+                        </div>
+                        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9rem;">
+                            <div><strong style="color: #ff8c00;">Instructor Response:</strong> <span
+                                    id="previewResponse" class="muted">-</span></div>
+                        </div>
+                    </div>
                     <iframe id="letterPreviewFrame" class="preview-frame" style="display:none;"></iframe>
                     <img id="letterPreviewImage" class="preview-image" style="display:none;" alt="Letter Preview">
                     <div class="download-row">
@@ -892,7 +903,7 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             if (!tbody) return;
 
             if (!timeouts.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding: 1.25rem; text-align: center;">No missing timeout records found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding: 1.25rem; text-align: center;">No missing timeout records found.</td></tr>';
                 if (cardsContainer) {
                     cardsContainer.innerHTML = '<div class="muted" style="padding: 1.25rem; text-align: center;">No missing timeout records found.</div>';
                 }
@@ -910,7 +921,7 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                 let actionsHtml = '';
                 if (hasDocument) {
                     actionsHtml += `
-                        <button class="icon-btn view" type="button" title="View Document" aria-label="View Document" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
+                        <button class="icon-btn view" type="button" title="View Document" aria-label="View Document" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}" data-reason="${(r.reason || '').replace(/"/g, '&quot;')}" data-response="${(r.instructor_response || '').replace(/"/g, '&quot;')}">
                             <i class="fas fa-eye"></i>
                         </button>
                     `;
@@ -930,22 +941,34 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                     `;
                 }
 
+                const blockEndTimes = {
+                    'morning': '12:00:00',
+                    'afternoon': '18:00:00',
+                    'overtime': '22:00:00',
+                    'regular': null
+                };
+
+                let estHours = '-';
+                if (r.time_in && r.block_type) {
+                    const endTime = blockEndTimes[r.block_type];
+                    if (endTime) {
+                        try {
+                            const dateStr = r.attendance_date || r.time_in.split(' ')[0];
+                            const timeInDate = new Date(r.time_in.includes(' ') ? r.time_in : dateStr + ' ' + r.time_in);
+                            const timeOutDate = new Date(dateStr + ' ' + endTime);
+                            const diff = (timeOutDate - timeInDate) / (1000 * 60 * 60);
+                            if (diff > 0) estHours = diff.toFixed(2) + ' hrs';
+                        } catch (e) { }
+                    }
+                }
+
                 return `
                     <tr data-id="${r.id}">
                         <td>${formatDate(r.attendance_date)}</td>
                         <td>${r.block_type || '-'}</td>
                         <td>${formatTime(r.time_in)}</td>
-                        <td>
-                            ${hasDocument ? `
-                                <a href="#" class="file-link" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
-                                    <i class="fas fa-file"></i>
-                                    <span>${fileLabel}</span>
-                                </a>
-                            ` : '<span class="muted">No document attached</span>'}
-                        </td>
-                        <td>${r.reason ? `<span title="${r.reason}">${r.reason.length > 30 ? r.reason.substring(0, 30) + '...' : r.reason}</span>` : '<span class="muted">-</span>'}</td>
+                        <td>${estHours}</td>
                         <td>${r.status ? getStatusBadge(r.status) : '<span class="muted">Not submitted</span>'}</td>
-                        <td>${r.instructor_response ? r.instructor_response : '<span class="muted">-</span>'}</td>
                         <td>
                             <div class="action-buttons">
                                 ${actionsHtml}
@@ -967,7 +990,7 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                     let cardActionsHtml = '';
                     if (hasDocument) {
                         cardActionsHtml += `
-                            <button class="icon-btn view" type="button" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}">
+                            <button class="icon-btn view" type="button" data-action="view" data-file="${fileHref}" data-filename="${fileLabel}" data-reason="${(r.reason || '').replace(/"/g, '&quot;')}" data-response="${(r.instructor_response || '').replace(/"/g, '&quot;')}">
                                 <i class="fas fa-eye"></i> View
                             </button>
                         `;
@@ -1039,11 +1062,17 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             }
         }
 
-        function setPreview(fileUrl, fileName) {
+        function setPreview(fileUrl, fileName, reason, response) {
             const frame = document.getElementById('letterPreviewFrame');
             const img = document.getElementById('letterPreviewImage');
             const dl = document.getElementById('downloadLetter');
             const title = document.getElementById('previewModalTitle');
+
+            // Update info section
+            const reasonEl = document.getElementById('previewReason');
+            const responseEl = document.getElementById('previewResponse');
+            if (reasonEl) reasonEl.textContent = reason || 'No reason provided';
+            if (responseEl) responseEl.textContent = response || 'No response yet';
 
             if (title) title.textContent = `Letter Preview - ${fileName || ''}`.trim();
             if (dl) {
@@ -1054,6 +1083,7 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             const lower = (fileName || fileUrl || '').toLowerCase();
             const isPdf = lower.endsWith('.pdf');
             const isImage = lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.webp');
+            const isDoc = lower.endsWith('.doc') || lower.endsWith('.docx');
 
             if (frame) frame.style.display = 'none';
             if (img) img.style.display = 'none';
@@ -1064,6 +1094,11 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
             } else if (isImage && img) {
                 img.src = fileUrl;
                 img.style.display = 'block';
+            } else if (isDoc && frame) {
+                // Use Google Docs Viewer for Word documents
+                const fullUrl = new URL(fileUrl, window.location.href).href;
+                frame.src = 'https://docs.google.com/gview?url=' + encodeURIComponent(fullUrl) + '&embedded=true';
+                frame.style.display = 'block';
             } else if (frame) {
                 frame.src = fileUrl;
                 frame.style.display = 'block';
@@ -1089,8 +1124,10 @@ $timeout_data = $studentService->getMissingTimeouts($dbId);
                 e.preventDefault();
                 const file = actionEl.getAttribute('data-file');
                 const name = actionEl.getAttribute('data-filename') || 'letter';
+                const reason = actionEl.getAttribute('data-reason') || '';
+                const response = actionEl.getAttribute('data-response') || '';
                 if (!file || file === '#') return;
-                setPreview(file, name);
+                setPreview(file, name, reason, response);
                 openModal(previewModal);
                 return;
             }

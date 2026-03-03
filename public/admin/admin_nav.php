@@ -40,14 +40,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <span>Sections</span>
             </a>
         </li>
-        <li <?= ($current_page == 'admin_reports.php' || $current_page == 'admin_Reports.php') ? 'class="active"' : '' ?>>
-            <a href="admin_Reports.php">
+        <li <?= ($current_page == 'admin_reports.php' || $current_page == 'admin_reports.php') ? 'class="active"' : '' ?>>
+            <a href="admin_reports.php">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
                     fill="#e3e3e3">
                     <path
                         d="M280-280h80v-200h-80v200Zm320 0h80v-400h-80v400Zm-160 0h80v-120h-80v120Zm0-200h80v-80h-80v80ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z" />
                 </svg>
                 <span>Reports</span>
+            </a>
+        </li>
+        <li <?= ($current_page == 'workplace_map.php' || $current_page == 'workplace_map.php') ? 'class="active"' : '' ?>>
+            <a href="workplace_map.php">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                    fill="#e3e3e3">
+                    <path
+                        d="m600-120-240-84-186 72q-20 8-37-4.5T120-170v-560q0-13 7.5-23t20.5-15l212-72 240 84 186-72q20-8 37 4.5t17 33.5v560q0 13-7.5 23T812-192l-212 72Zm-40-98v-468l-160-56v468l160 56Zm80 0 120-40v-474l-120 46v468Zm-440-10 120-46v-468l-120 40v474Zm440-458v468-468Zm-320-56v468-468Z" />
+                </svg>
+                <span>Map</span>
             </a>
         </li>
         <li <?= ($current_page == 'history.php' || $current_page == 'history.php') ? 'class="active"' : '' ?>>
@@ -60,6 +70,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <span>History</span>
             </a>
         </li>
+
         <li>
             <a href="#" onclick="showLogoutModal(); return false;">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"

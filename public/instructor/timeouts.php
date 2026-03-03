@@ -52,6 +52,7 @@ try {
             ar.forgot_timeout_file as letter_file,
             ar.request_status as status,
             ar.instructor_response as feedback,
+            u.id as user_id,
             u.full_name as student_name,
             u.school_id,
             s.section_name
@@ -347,6 +348,48 @@ require_once 'instructor_nav.php';
             display: block;
             background: white;
         }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 1rem;
+            border-top: 1px solid var(--line-clr);
+        }
+
+        .pagination button {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--line-clr);
+            background: transparent;
+            color: var(--text-clr);
+            border-radius: 0.4em;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--accent-clr);
+            color: var(--accent-clr);
+        }
+
+        .pagination button.active {
+            background: var(--accent-clr);
+            border-color: var(--accent-clr);
+            color: white;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .pagination-info {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+            margin-left: 0.75rem;
+        }
     </style>
 </head>
 
@@ -371,9 +414,6 @@ require_once 'instructor_nav.php';
                             <th>Student Name</th>
                             <th>Date</th>
                             <th>Block Type</th>
-                            <th>Time In</th>
-                            <th>Reason</th>
-                            <th>Letter Document</th>
                             <th>Status</th>
                             <th>Instructor Feedback</th>
                             <th>Actions</th>
@@ -382,7 +422,7 @@ require_once 'instructor_nav.php';
                     <tbody>
                         <?php if (empty($timeout_records)): ?>
                             <tr>
-                                <td colspan="9" style="text-align: center; padding: 2rem; color: rgba(255,255,255,0.6);">
+                                <td colspan="6" style="text-align: center; padding: 2rem; color: rgba(255,255,255,0.6);">
                                     No timeout requests found.
                                 </td>
                             </tr>
@@ -390,33 +430,22 @@ require_once 'instructor_nav.php';
                             <?php foreach ($timeout_records as $r): ?>
                                 <tr data-id="<?php echo $r['id']; ?>"
                                     data-letter="<?php echo htmlspecialchars($r['letter_file'] ?? ''); ?>"
-                                    data-time-in="<?php echo $r['time_in']; ?>" data-block="<?php echo $r['block_type']; ?>">
+                                    data-time-in="<?php echo $r['time_in']; ?>" data-block="<?php echo $r['block_type']; ?>"
+                                    data-reason="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>">
                                     <td>
-                                        <div style="font-weight: 700;">
-                                            <?php echo htmlspecialchars($r['student_name']); ?>
-                                        </div>
-                                        <div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.7);">
-                                            <?php echo htmlspecialchars($r['school_id']); ?> •
-                                            <?php echo htmlspecialchars($r['section_name'] ?? 'N/A'); ?>
-                                        </div>
+                                        <a href="student_information.php?id=<?php echo $r['user_id']; ?>"
+                                            style="text-decoration: none; color: inherit;" title="View student profile">
+                                            <div style="font-weight: 700; color: var(--accent-clr);">
+                                                <?php echo htmlspecialchars($r['student_name']); ?>
+                                            </div>
+                                            <div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.7);">
+                                                <?php echo htmlspecialchars($r['school_id']); ?> •
+                                                <?php echo htmlspecialchars($r['section_name'] ?? 'N/A'); ?>
+                                            </div>
+                                        </a>
                                     </td>
                                     <td><?php echo date('M d, Y', strtotime($r['attendance_date'])); ?></td>
                                     <td><?php echo ucfirst($r['block_type']); ?></td>
-                                    <td><?php echo date('g:i A', strtotime($r['time_in'])); ?></td>
-                                    <td style="max-width: 250px;">
-                                        <?php echo $r['reason'] ? htmlspecialchars($r['reason']) : '<span style="opacity:0.65;">No reason provided</span>'; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($r['letter_file']): ?>
-                                            <a class="doc-link" href="<?php echo htmlspecialchars($r['letter_file']); ?>"
-                                                target="_blank" rel="noopener noreferrer">
-                                                <i class="fas fa-file-pdf"></i>
-                                                View Letter
-                                            </a>
-                                        <?php else: ?>
-                                            <span style="opacity:0.65;">No document</span>
-                                        <?php endif; ?>
-                                    </td>
                                     <td>
                                         <?php if ($r['status']): ?>
                                             <span class="status-badge status-<?php echo $r['status']; ?>" data-status>
@@ -456,6 +485,8 @@ require_once 'instructor_nav.php';
                 </table>
             </div>
         </div>
+
+        <div id="paginationControls" class="pagination"></div>
     </main>
 
     <div id="letterModal" class="doc-modal" aria-hidden="true">
@@ -473,6 +504,13 @@ require_once 'instructor_nav.php';
                 </div>
             </div>
             <div class="doc-modal-body">
+                <div id="letterInfoSection"
+                    style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--line-clr); background: var(--base-clr); display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9rem;">
+                    <div><strong style="color: var(--accent-clr);">Time In:</strong> <span id="letterTimeIn">-</span>
+                    </div>
+                    <div><strong style="color: var(--accent-clr);">Reason:</strong> <span id="letterReason"
+                            style="max-width: 500px; display: inline-block;">-</span></div>
+                </div>
                 <iframe id="letterFrame" class="doc-frame" src="" title="Letter Preview"></iframe>
             </div>
         </div>
@@ -486,18 +524,88 @@ require_once 'instructor_nav.php';
 
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
+            const perPage = 10;
+            let currentPage = 1;
+            let filteredRows = rows;
+
+            const paginationEl = document.getElementById('paginationControls');
+
+            function getVisibleRows() {
+                const q = (search.value || '').trim().toLowerCase();
+                return rows.filter(row => !q || row.textContent.toLowerCase().includes(q));
+            }
+
+            function renderPagination() {
+                filteredRows = getVisibleRows();
+                const totalPages = Math.max(1, Math.ceil(filteredRows.length / perPage));
+                if (currentPage > totalPages) currentPage = totalPages;
+
+                // Hide all rows first
+                rows.forEach(r => r.style.display = 'none');
+
+                // Show only current page rows
+                const start = (currentPage - 1) * perPage;
+                const end = start + perPage;
+                filteredRows.slice(start, end).forEach(r => r.style.display = '');
+
+                // Build pagination controls
+                if (filteredRows.length <= perPage) {
+                    paginationEl.innerHTML = '';
+                    return;
+                }
+
+                let html = `<button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>`;
+
+                for (let i = 1; i <= totalPages; i++) {
+                    if (totalPages <= 7 || i === 1 || i === totalPages || Math.abs(i - currentPage) <= 1) {
+                        html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+                    } else if (Math.abs(i - currentPage) === 2) {
+                        html += `<span style="color: rgba(255,255,255,0.4);">…</span>`;
+                    }
+                }
+
+                html += `<button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+                html += `<span class="pagination-info">${filteredRows.length} record${filteredRows.length !== 1 ? 's' : ''}</span>`;
+
+                paginationEl.innerHTML = html;
+            }
+
+            // Make goToPage global for onclick
+            window.goToPage = function (page) {
+                const totalPages = Math.max(1, Math.ceil(filteredRows.length / perPage));
+                if (page < 1 || page > totalPages) return;
+                currentPage = page;
+                renderPagination();
+            };
 
             const modal = document.getElementById('letterModal');
             const frame = document.getElementById('letterFrame');
             const closeBtn = document.getElementById('letterCloseBtn');
             const downloadBtn = document.getElementById('letterDownloadBtn');
 
-            function openModal(fileUrl, title) {
+            function openModal(fileUrl, title, timeIn, reason) {
                 if (!modal || !frame || !downloadBtn) return;
                 frame.src = fileUrl;
                 downloadBtn.href = fileUrl;
                 const titleEl = document.getElementById('letterModalTitle');
                 if (titleEl && title) titleEl.textContent = title;
+
+                // Show time-in and reason in modal
+                const timeInEl = document.getElementById('letterTimeIn');
+                const reasonEl = document.getElementById('letterReason');
+                if (timeInEl) {
+                    if (timeIn) {
+                        try {
+                            timeInEl.textContent = new Date(timeIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                        } catch (e) {
+                            timeInEl.textContent = timeIn;
+                        }
+                    } else {
+                        timeInEl.textContent = '-';
+                    }
+                }
+                if (reasonEl) reasonEl.textContent = reason || 'No reason provided';
+
                 modal.classList.add('open');
                 modal.setAttribute('aria-hidden', 'false');
             }
@@ -524,14 +632,14 @@ require_once 'instructor_nav.php';
             });
 
             function applySearch() {
-                const q = (search.value || '').trim().toLowerCase();
-                rows.forEach(row => {
-                    const txt = row.textContent.toLowerCase();
-                    row.style.display = (!q || txt.includes(q)) ? '' : 'none';
-                });
+                currentPage = 1;
+                renderPagination();
             }
 
             search.addEventListener('input', applySearch);
+
+            // Initial render
+            renderPagination();
 
             function setStatus(row, status, feedbackText) {
                 const badge = row.querySelector('[data-status]');
@@ -593,9 +701,11 @@ require_once 'instructor_nav.php';
                 const action = btn.getAttribute('data-action');
                 if (action === 'view') {
                     const fileUrl = row.getAttribute('data-letter') || '';
-                    if (!fileUrl) return; // Should not happen if button exists
+                    if (!fileUrl) return;
                     const studentName = row.children && row.children[0] ? row.children[0].textContent.trim() : 'Letter Preview';
-                    openModal(fileUrl, studentName);
+                    const timeIn = row.getAttribute('data-time-in') || '';
+                    const reason = row.getAttribute('data-reason') || '';
+                    openModal(fileUrl, studentName, timeIn, reason);
                     return;
                 }
 

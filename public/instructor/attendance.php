@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ar.time_out,
                     ar.hours,
                     ar.status,
+                    ar.within_radius,
                     ar.photo_path,
                     ar.time_in_latitude,
                     ar.time_in_longitude,
@@ -46,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     u.school_id,
                     u.profile_pic_path,
                     sw.company_name as workplace,
+                    sw.schedule_start_time,
                     s.section_code
                 FROM attendance_records ar
                 INNER JOIN students st ON ar.student_id = st.id
@@ -415,6 +417,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .auto-refresh input[type="checkbox"] {
             width: auto;
         }
+
+        .off-site-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: rgba(220, 53, 69, 0.15);
+            color: #ff6b6b;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 4px;
+        }
+
+        .late-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: rgba(255, 165, 0, 0.15);
+            color: #ffa500;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 4px;
+        }
     </style>
 </head>
 
@@ -465,6 +489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <label for="block-type">Block Type</label>
                     <select id="block-type">
                         <option value="all">All Blocks</option>
+                        <option value="regular">Regular</option>
                         <option value="morning">Morning</option>
                         <option value="afternoon">Afternoon</option>
                         <option value="overtime">Overtime</option>
@@ -529,11 +554,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function () {
-            // Set default date range to current month
+            // Set default date range to current month (using local time, not UTC)
             const today = new Date();
-            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            document.getElementById('date-from').valueAsDate = firstDay;
-            document.getElementById('date-to').valueAsDate = today;
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('date-from').value = `${yyyy}-${mm}-01`;
+            document.getElementById('date-to').value = `${yyyy}-${mm}-${dd}`;
 
             // Load initial data
             loadAttendance();
@@ -658,6 +685,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 const statusClass = `status-${record.status}`;
                 const workplace = record.workplace || 'Not assigned';
 
+                // Calculate late minutes for regular blocks
+                let lateBadge = '';
+                if (record.block_type === 'regular' && record.schedule_start_time && record.time_in) {
+                    const datePart = record.date; // YYYY-MM-DD
+                    const scheduleStart = new Date(datePart + 'T' + record.schedule_start_time);
+                    const timeInParts = record.time_in.includes(' ') ? record.time_in.split(' ')[1] : record.time_in;
+                    const actualTimeIn = new Date(datePart + 'T' + timeInParts);
+                    const lateMs = actualTimeIn - scheduleStart;
+                    const lateMinutes = Math.floor(lateMs / 60000);
+                    if (lateMinutes >= 20) {
+                        const hrs = Math.floor(lateMinutes / 60);
+                        const mins = lateMinutes % 60;
+                        const lateStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                        lateBadge = `<span class="late-badge" title="Late by ${lateMinutes} minutes from scheduled start (${record.schedule_start_time})"> Late ${lateStr}</span>`;
+                    }
+                }
+
                 return `
                     <tr>
                         <td>
@@ -672,8 +716,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <td>${record.section_code}</td>
                         <td>${workplace}</td>
                         <td>${record.date}</td>
-                        <td style="text-transform: capitalize;">${record.block_type}</td>
-                        <td>${timeIn}</td>
+                        <td>${record.block_type}</td>
+                        <td>
+                            ${timeIn}
+                            ${(record.within_radius !== null && record.within_radius !== undefined && String(record.within_radius) === '0') ? '<span class="off-site-badge" title="Timed in outside workplace radius"> Off-site</span>' : ''}
+                        </td>
                         <td>${timeOut}</td>
                         <td>${hours}</td>
                         <td><span class="status ${statusClass}">${record.status}</span></td>
@@ -698,11 +745,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             modal.style.display = 'block';
             modalImg.src = imagePath;
+
+            // Calculate late info
+            let lateHtml = '';
+            if (record.block_type === 'regular' && record.schedule_start_time && record.time_in) {
+                const datePart = record.date;
+                const scheduleStart = new Date(datePart + 'T' + record.schedule_start_time);
+                const timeInParts = record.time_in.includes(' ') ? record.time_in.split(' ')[1] : record.time_in;
+                const actualTimeIn = new Date(datePart + 'T' + timeInParts);
+                const lateMinutes = Math.floor((actualTimeIn - scheduleStart) / 60000);
+                if (lateMinutes >= 20) {
+                    const hrs = Math.floor(lateMinutes / 60);
+                    const mins = lateMinutes % 60;
+                    const lateStr = hrs > 0 ? `${hrs} hour${hrs > 1 ? 's' : ''} and ${mins} minute${mins !== 1 ? 's' : ''}` : `${mins} minutes`;
+                    lateHtml = `<div style="margin-top: 8px; padding: 6px 10px; background: rgba(255,165,0,0.15); border-radius: 6px; color: #ffa500; font-weight: 600; font-size: 0.85rem;">⚠️ Late by ${lateStr} (Scheduled: ${record.schedule_start_time})</div>`;
+                }
+            }
+
             modalDetails.innerHTML = `
                 <strong>${record.full_name}</strong> (${record.school_id})<br>
-                ${record.date} • ${record.block_type}<br>
+                ${record.date} &bull; ${record.block_type}<br>
                 Time In: ${timeIn} | Time Out: ${timeOut}<br>
                 Status: ${record.status}
+                ${lateHtml}
             `;
             document.body.style.overflow = 'hidden';
         }

@@ -1,6 +1,56 @@
 <?php
 // Require admin authentication
 require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
+
+// Double Hours AJAX handlers
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dh_action'])) {
+    header('Content-Type: application/json');
+    $response = ['success' => false];
+
+    try {
+        $config = require __DIR__ . '/../../config/database.php';
+        $dsn = sprintf("mysql:host=%s;dbname=%s;charset=%s", $config['host'], $config['dbname'], $config['charset']);
+        $db = new PDO($dsn, $config['username'], $config['password'], $config['options']);
+
+        switch ($_POST['dh_action']) {
+            case 'get':
+                $stmt = $db->query("SELECT id, date, created_at FROM double_hours_dates ORDER BY date DESC");
+                $response = ['success' => true, 'dates' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+                break;
+
+            case 'add':
+                $date = $_POST['date'] ?? '';
+                if (empty($date)) {
+                    $response['error'] = 'Date is required.';
+                    break;
+                }
+                $stmt = $db->prepare("INSERT IGNORE INTO double_hours_dates (date, created_by) VALUES (?, ?)");
+                $stmt->execute([$date, $_SESSION['user_id'] ?? null]);
+                if ($stmt->rowCount() > 0) {
+                    $response = ['success' => true, 'message' => 'Double hours date added.'];
+                } else {
+                    $response['error'] = 'Date already exists.';
+                }
+                break;
+
+            case 'delete':
+                $id = (int) ($_POST['id'] ?? 0);
+                if ($id <= 0) {
+                    $response['error'] = 'Invalid ID.';
+                    break;
+                }
+                $stmt = $db->prepare("DELETE FROM double_hours_dates WHERE id = ?");
+                $stmt->execute([$id]);
+                $response = ['success' => true, 'message' => 'Date removed.'];
+                break;
+        }
+    } catch (Exception $e) {
+        $response['error'] = 'Database error: ' . $e->getMessage();
+    }
+
+    echo json_encode($response);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -243,7 +293,7 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
         }
 
         .form-control {
-            width: 100%;
+            width: 90%;
             padding: 0.75em;
             border: 1px solid var(--line-clr);
             border-radius: 0.5em;
@@ -529,6 +579,9 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                         onclick="openModal('emailModal')">
                         <i class="fas fa-envelope"></i> Compose Email
                     </button>
+                    <button class="add-user-btn" onclick="openDoubleHoursModal()">
+                        <i class="fa-regular fa-calendar"></i> Double hours
+                    </button>
                     <button id="addUserBtn" class="add-user-btn">
                         <i class="fas fa-plus"></i> Add New User
                     </button>
@@ -607,6 +660,8 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                             </tr>
                         <?php else: ?>
                             <?php foreach ($users as $user): ?>
+                                <?php if ((int) $user['id'] === (int) ($_SESSION['user_id'] ?? 0))
+                                    continue; ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($user['school_id']); ?></td>
                                     <td>
@@ -637,7 +692,8 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                                         </button>
                                         <button class="btn btn-delete" title="Delete Account"
                                             data-user-id="<?php echo htmlspecialchars($user['id']); ?>"
-                                            data-school-id="<?php echo htmlspecialchars($user['school_id']); ?>">
+                                            data-school-id="<?php echo htmlspecialchars($user['school_id']); ?>"
+                                            data-role="<?php echo htmlspecialchars($user['role']); ?>">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </td>
@@ -980,6 +1036,146 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
             </div>
         </div>
     </div>
+
+    <!-- Double Hours Modal -->
+    <div id="doubleHoursModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fa-regular fa-calendar"></i> Double Hours Dates</h3>
+                <button class="close-btn" onclick="closeModal('doubleHoursModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 1.25em;">
+                <p style="color: var(--secondary-text-clr); font-size: 0.9em; margin: 0 0 1em;">
+                    Students who complete attendance on these dates will earn <strong
+                        style="color: var(--accent-clr);">2× hours</strong>.
+                </p>
+                <div style="display: flex; gap: 0.75em; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="dhDateInput">Select Date</label>
+                        <input type="date" id="dhDateInput" class="form-control">
+                    </div>
+                    <button class="btn btn-primary" id="dhAddBtn" onclick="addDoubleHoursDate()"
+                        style="height: 42px; white-space: nowrap;">
+                        <i class="fas fa-plus"></i> Add Date
+                    </button>
+                </div>
+            </div>
+            <div id="dhMessage" style="display: none; padding: 0.75rem; border-radius: 0.5em; margin-bottom: 1rem;">
+            </div>
+            <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--line-clr); border-radius: 0.5em;">
+                <table class="user-table" style="margin: 0;">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th style="width: 80px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dhTableBody">
+                        <tr>
+                            <td colspan="3" style="text-align: center; color: var(--secondary-text-clr); padding: 2em;">
+                                Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="btn-group" style="margin-top: 1em;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('doubleHoursModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === Double Hours Functions ===
+        function openDoubleHoursModal() {
+            openModal('doubleHoursModal');
+            loadDoubleHoursDates();
+        }
+
+        function loadDoubleHoursDates() {
+            const body = new FormData();
+            body.append('dh_action', 'get');
+            fetch('admin_userpage.php', { method: 'POST', body })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        renderDoubleHoursList(data.dates);
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('dhTableBody').innerHTML =
+                        '<tr><td colspan="3" style="text-align:center;color:#ff4d4d;padding:1.5em;">Error loading dates.</td></tr>';
+                });
+        }
+
+        function renderDoubleHoursList(dates) {
+            const tbody = document.getElementById('dhTableBody');
+            if (!dates || dates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--secondary-text-clr);padding:2em;"><i class="fas fa-calendar-xmark" style="font-size:1.5em;display:block;margin-bottom:0.5em;opacity:0.5;"></i>No double hours dates set.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = dates.map(d => {
+                const dt = new Date(d.date + 'T00:00:00');
+                const dayName = dt.toLocaleDateString('en-US', { weekday: 'long' });
+                const formatted = dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                return `<tr>
+                    <td>${formatted}</td>
+                    <td>${dayName}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-delete" title="Delete" onclick="deleteDoubleHoursDate(${d.id})" style="padding:0.4em 0.6em;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function addDoubleHoursDate() {
+            const input = document.getElementById('dhDateInput');
+            const date = input.value;
+            if (!date) { alert('Please select a date.'); return; }
+            const btn = document.getElementById('dhAddBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            const body = new FormData();
+            body.append('dh_action', 'add');
+            body.append('date', date);
+            fetch('admin_userpage.php', { method: 'POST', body })
+                .then(r => r.json())
+                .then(data => {
+                    const msg = document.getElementById('dhMessage');
+                    if (data.success) {
+                        msg.className = '';
+                        msg.style.cssText = 'display:block;padding:0.75rem;border-radius:0.5em;margin-bottom:1rem;background:rgba(26,210,28,0.15);color:#1ad21c;border:1px solid #1ad21c;';
+                        msg.textContent = data.message;
+                        input.value = '';
+                        loadDoubleHoursDates();
+                    } else {
+                        msg.style.cssText = 'display:block;padding:0.75rem;border-radius:0.5em;margin-bottom:1rem;background:rgba(255,77,77,0.15);color:#ff4d4d;border:1px solid #ff4d4d;';
+                        msg.textContent = data.error || 'Error adding date.';
+                    }
+                    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-plus"></i> Add Date';
+                });
+        }
+
+        function deleteDoubleHoursDate(id) {
+            if (!confirm('Remove this double hours date?')) return;
+            const body = new FormData();
+            body.append('dh_action', 'delete');
+            body.append('id', id);
+            fetch('admin_userpage.php', { method: 'POST', body })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) loadDoubleHoursDates();
+                    else alert(data.error || 'Error deleting.');
+                });
+        }
+    </script>
 
     <script>
         // Modal Functions
@@ -1383,51 +1579,68 @@ require_once __DIR__ . '/../../app/middleware/requireAdmin.php';
                     const button = e.target.classList.contains('btn-delete') ? e.target : e.target.closest('.btn-delete');
                     const userId = button.getAttribute('data-user-id');
                     const schoolId = button.getAttribute('data-school-id');
+                    const role = button.getAttribute('data-role');
 
                     if (!userId || !schoolId) {
                         console.error('Missing user data');
                         return;
                     }
 
-                    // Double confirmation for delete
-                    if (confirm(`Are you sure you want to delete user "${schoolId}"?\n\nThis action cannot be undone and will permanently remove the user and all associated data.`)) {
-                        if (confirm(`Final confirmation: Delete user "${schoolId}"?\n\nThis is your last chance to cancel.`)) {
-                            // Disable button during deletion
-                            button.disabled = true;
-                            const originalHTML = button.innerHTML;
-                            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    let confirmed = false;
 
-                            // Send delete request
-                            fetch('delete_user.php', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    user_id: userId
-                                })
+                    if (role === 'admin') {
+                        // Admin deletion requires typing "delete"
+                        const input = prompt(`You are about to delete an ADMIN account "${schoolId}".\n\nThis action cannot be undone.\n\nType "delete" to confirm:`);
+                        if (input && input.trim().toLowerCase() === 'delete') {
+                            confirmed = true;
+                        } else if (input !== null) {
+                            alert('Deletion cancelled. You must type "delete" to confirm.');
+                        }
+                    } else {
+                        // Normal double confirmation for non-admin users
+                        if (confirm(`Are you sure you want to delete user "${schoolId}"?\n\nThis action cannot be undone and will permanently remove the user and all associated data.`)) {
+                            if (confirm(`Final confirmation: Delete user "${schoolId}"?\n\nThis is your last chance to cancel.`)) {
+                                confirmed = true;
+                            }
+                        }
+                    }
+
+                    if (confirmed) {
+                        // Disable button during deletion
+                        button.disabled = true;
+                        const originalHTML = button.innerHTML;
+                        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                        // Send delete request
+                        fetch('delete_user.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                user_id: userId
                             })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        // Show success message
-                                        alert(data.message || 'User deleted successfully!');
-                                        // Reload page to refresh user list
-                                        window.location.reload();
-                                    } else {
-                                        // Show error message
-                                        alert(data.message || 'Error deleting user. Please try again.');
-                                        button.disabled = false;
-                                        button.innerHTML = originalHTML;
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Error:', error);
-                                    alert('Network error. Please try again.');
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    // Show success message
+                                    alert(data.message || 'User deleted successfully!');
+                                    // Reload page to refresh user list
+                                    window.location.reload();
+                                } else {
+                                    // Show error message
+                                    alert(data.message || 'Error deleting user. Please try again.');
                                     button.disabled = false;
                                     button.innerHTML = originalHTML;
-                                });
-                        }
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Network error. Please try again.');
+                                button.disabled = false;
+                                button.innerHTML = originalHTML;
+                            });
                     }
                 }
             });
