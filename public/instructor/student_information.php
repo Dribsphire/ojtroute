@@ -96,13 +96,11 @@ try {
             $attendance[$date] = [
                 'status' => 'present',
                 'blocks' => [
-                    'morning' => null,
-                    'afternoon' => null,
+                    'regular' => null,
                     'overtime' => null
                 ],
                 'details' => [
-                    'morning' => null,
-                    'afternoon' => null,
+                    'regular' => null,
                     'overtime' => null
                 ]
             ];
@@ -143,13 +141,11 @@ try {
                 $attendance[$excusedDate] = [
                     'status' => 'excused',
                     'blocks' => [
-                        'morning' => null,
-                        'afternoon' => null,
+                        'regular' => null,
                         'overtime' => null
                     ],
                     'details' => [
-                        'morning' => null,
-                        'afternoon' => null,
+                        'regular' => null,
                         'overtime' => null
                     ],
                     'excuse_reason' => $excuse['reason'],
@@ -532,12 +528,20 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
                     if ($isPresent || $isExcused)
                         $classes .= ' clickable';
 
-                    $blocks = isset($attendance[$dateKey]) ? $attendance[$dateKey]['blocks'] : ['morning' => null, 'afternoon' => null, 'overtime' => null];
-                    $details = isset($attendance[$dateKey]) ? $attendance[$dateKey]['details'] : ['morning' => null, 'afternoon' => null, 'overtime' => null];
+                    $blocks = isset($attendance[$dateKey]) ? $attendance[$dateKey]['blocks'] : ['regular' => null, 'overtime' => null];
+                    $details = isset($attendance[$dateKey]) ? $attendance[$dateKey]['details'] : ['regular' => null, 'overtime' => null];
 
-                    $m = $blocks['morning'] ?? null;
-                    $a = $blocks['afternoon'] ?? null;
+                    $r = $blocks['regular'] ?? null;
                     $o = $blocks['overtime'] ?? null;
+
+                    // Calculate total hours for the day
+                    $totalHours = 0;
+                    if (isset($details['regular']) && $details['regular'] && $details['regular']['hours']) {
+                        $totalHours += floatval($details['regular']['hours']);
+                    }
+                    if (isset($details['overtime']) && $details['overtime'] && $details['overtime']['hours']) {
+                        $totalHours += floatval($details['overtime']['hours']);
+                    }
 
                     // Get excuse data if available
                     $excuseReason = isset($attendance[$dateKey]['excuse_reason']) ? $attendance[$dateKey]['excuse_reason'] : '';
@@ -546,9 +550,9 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
                     echo '<div class="' . htmlspecialchars($classes) . '"'
                         . ' data-date="' . htmlspecialchars($dateKey) . '"'
                         . ' data-status="' . htmlspecialchars((string) $status) . '"'
-                        . ' data-morning="' . htmlspecialchars((string) $m) . '"'
-                        . ' data-afternoon="' . htmlspecialchars((string) $a) . '"'
+                        . ' data-regular="' . htmlspecialchars((string) $r) . '"'
                         . ' data-overtime="' . htmlspecialchars((string) $o) . '"'
+                        . ' data-total-hours="' . htmlspecialchars(number_format($totalHours, 2)) . '"'
                         . ' data-excuse-reason="' . htmlspecialchars($excuseReason) . '"'
                         . ' data-excuse-hours="' . htmlspecialchars((string) $excuseHours) . '"'
                         . ' data-has-excuse="' . ($hasExcuse ? 'true' : 'false') . '"'
@@ -677,25 +681,22 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
 
                 <div id="excuseDetailsContainer"></div>
 
+                <!-- Total Hours Summary -->
+                <div id="dayHoursSummary" style="background: rgba(26, 210, 28, 0.1); border: 1px solid rgba(26, 210, 28, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 600; color: var(--accent-clr);"><i class="fas fa-clock"></i> Total Hours Worked</span>
+                    <span id="dayTotalHours" style="font-size: 1.2rem; font-weight: 700; color: var(--accent-clr);">0.00 hrs</span>
+                </div>
+
                 <div class="attendance-blocks">
                     <div class="attendance-block">
-                        <h4>Morning Block</h4>
-                        <div class="attendance-image">
-                            <img src="../images/attendanceSample/student_21_morning_1759975793.jpg"
-                                alt="Morning Attendance" class="attendance-selfie">
+                        <h4>Regular Block</h4>
+                        <div class="attendance-image no-overtime">
+                            <i class="fas fa-clock"></i>
+                            <p>No Record</p>
                         </div>
-                        <div class="attendance-time">Time In: 8:15 AM</div>
-                        <div class="attendance-status">Status: <span class="status-present">Present</span></div>
-                    </div>
-
-                    <div class="attendance-block">
-                        <h4>Afternoon Block</h4>
-                        <div class="attendance-image">
-                            <img src="../images/attendanceSample/student_31_afternoon_1760146808.jpg"
-                                alt="Afternoon Attendance" class="attendance-selfie">
-                        </div>
-                        <div class="attendance-time">Time In: 2:20 PM</div>
-                        <div class="attendance-status">Status: <span class="status-present">Present</span></div>
+                        <div class="attendance-time">-</div>
+                        <div class="attendance-hours">Hours: -</div>
+                        <div class="attendance-status">Status: <span class="muted">-</span></div>
                     </div>
 
                     <div class="attendance-block">
@@ -705,6 +706,7 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
                             <p>No Overtime Recorded</p>
                         </div>
                         <div class="attendance-time">-</div>
+                        <div class="attendance-hours">Hours: -</div>
                         <div class="attendance-status">Status: <span class="muted">-</span></div>
                     </div>
                 </div>
@@ -752,7 +754,7 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
 
             .attendance-blocks {
                 display: grid;
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(2, 1fr);
                 gap: 1.5rem;
                 margin-top: 1.5rem;
             }
@@ -800,6 +802,7 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
             }
 
             .attendance-time,
+            .attendance-hours,
             .attendance-status {
                 margin: 0.5rem 0;
                 font-size: 0.9rem;
@@ -916,19 +919,26 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
 
                         // Get all attendance blocks
                         const allBlocks = document.querySelectorAll('.attendance-block');
-                        if (allBlocks.length < 3) {
+                        if (allBlocks.length < 2) {
                             console.error('Modal structure incomplete');
                             return;
                         }
 
+                        // Update total hours summary
+                        const dayHoursSummary = document.getElementById('dayHoursSummary');
+                        const dayTotalHours = document.getElementById('dayTotalHours');
+                        let totalHrs = 0;
+
                         // Update modal content for each block
-                        const blocks = ['morning', 'afternoon', 'overtime'];
+                        const blocks = ['regular', 'overtime'];
+                        const blockLabels = { 'regular': 'Regular', 'overtime': 'Overtime' };
                         blocks.forEach((blockName, index) => {
                             const blockDiv = allBlocks[index];
                             if (!blockDiv) return;
 
                             const imgDiv = blockDiv.querySelector('.attendance-image');
                             const timeDiv = blockDiv.querySelector('.attendance-time');
+                            const hoursDiv = blockDiv.querySelector('.attendance-hours');
                             const statusDiv = blockDiv.querySelector('.attendance-status');
 
                             if (!imgDiv || !timeDiv || !statusDiv) {
@@ -936,25 +946,52 @@ $displayDocs = array_slice($approvedDocs, $offset, $perPage);
                                 return;
                             }
 
-                            // If pure excuse, row might be the dummy structure or actual attendance
-                            // If row is null but we have excuse, we should show empty blocks
-                            // But our PHP logic ensures 'row' exists for excused dates too.
-
                             const photo = row ? row.blocks[blockName] : null;
                             const details = row ? row.details[blockName] : null;
 
                             if (photo && details) {
-                                imgDiv.innerHTML = `<img src="${photo}" alt="${blockName} Attendance" class="attendance-selfie">`;
+                                imgDiv.innerHTML = `<img src="${photo}" alt="${blockLabels[blockName]} Attendance" class="attendance-selfie">`;
                                 imgDiv.classList.remove('no-overtime');
-                                timeDiv.innerHTML = `Time In: ${formatTime(details.time_in)}<br>Time Out: ${formatTime(details.time_out)}<br>Hours: ${details.hours ? parseFloat(details.hours).toFixed(2) : '-'} hrs`;
-                                statusDiv.innerHTML = `Status: <span class="status-present">${details.status || 'Present'}</span>`;
+                                timeDiv.innerHTML = `Time In: ${formatTime(details.time_in)}<br>Time Out: ${formatTime(details.time_out)}`;
+                                const hrs = details.hours ? parseFloat(details.hours).toFixed(2) : '0.00';
+                                if (hoursDiv) hoursDiv.innerHTML = `Hours: <strong>${hrs} hrs</strong>`;
+                                totalHrs += details.hours ? parseFloat(details.hours) : 0;
+                                // Map status to display
+                                let statusText = details.status || 'Present';
+                                let statusClass = 'status-present';
+                                if (statusText === 'ongoing') { statusText = 'Ongoing'; statusClass = 'status-pending'; }
+                                else if (statusText === 'completed') { statusText = 'Completed'; statusClass = 'status-approved'; }
+                                statusDiv.innerHTML = `Status: <span class="${statusClass}">${statusText}</span>`;
+                            } else if (details && !photo) {
+                                // Has record but no photo
+                                imgDiv.innerHTML = '<i class="fas fa-user-clock"></i><p>No Photo</p>';
+                                imgDiv.classList.add('no-overtime');
+                                timeDiv.innerHTML = `Time In: ${formatTime(details.time_in)}<br>Time Out: ${formatTime(details.time_out)}`;
+                                const hrs = details.hours ? parseFloat(details.hours).toFixed(2) : '0.00';
+                                if (hoursDiv) hoursDiv.innerHTML = `Hours: <strong>${hrs} hrs</strong>`;
+                                totalHrs += details.hours ? parseFloat(details.hours) : 0;
+                                let statusText = details.status || 'Present';
+                                let statusClass = 'status-present';
+                                if (statusText === 'ongoing') { statusText = 'Ongoing'; statusClass = 'status-pending'; }
+                                else if (statusText === 'completed') { statusText = 'Completed'; statusClass = 'status-approved'; }
+                                statusDiv.innerHTML = `Status: <span class="${statusClass}">${statusText}</span>`;
                             } else {
-                                imgDiv.innerHTML = '<i class="fas fa-clock"></i><p>No Record</p>';
+                                const noLabel = blockName === 'overtime' ? 'No Overtime Recorded' : 'No Record';
+                                imgDiv.innerHTML = `<i class="fas fa-clock"></i><p>${noLabel}</p>`;
                                 imgDiv.classList.add('no-overtime');
                                 timeDiv.innerHTML = '-';
+                                if (hoursDiv) hoursDiv.innerHTML = 'Hours: -';
                                 statusDiv.innerHTML = 'Status: <span class="muted">-</span>';
                             }
                         });
+
+                        // Update total hours display
+                        if (dayTotalHours) {
+                            dayTotalHours.textContent = totalHrs.toFixed(2) + ' hrs';
+                        }
+                        if (dayHoursSummary) {
+                            dayHoursSummary.style.display = (status === 'present') ? 'flex' : 'none';
+                        }
 
                         if (modal) {
                             modal.style.display = 'block';

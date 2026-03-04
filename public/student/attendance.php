@@ -69,15 +69,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Prepare Data for Frontend - include full record details
+// FIX: Filter out expired ongoing records from previous days so they don't show
+// a stale "Time Out" / "Timeout Ended" button when the student hasn't timed in today.
 $recordedBlocks = [];
+$manilaTz = new DateTimeZone('Asia/Manila');
+$nowManila = new DateTime('now', $manilaTz);
+$todayDateManila = $nowManila->format('Y-m-d');
+
 foreach ($todayAttendance as $record) {
-    $recordedBlocks[$record['block_type']] = [
-        'status' => $record['status'],
-        'time_in' => $record['time_in'],
-        'time_out' => $record['time_out'],
-        'missing_timeout_flagged' => !empty($record['missing_timeout_flagged_at']),
-        'request_status' => $record['request_status'] ?? null
-    ];
+    $recDate = $record['attendance_date'] ?? $todayDateManila;
+    $isFromPreviousDay = ($recDate !== $todayDateManila);
+
+    // If this is a previous day's ongoing record (no time_out), check if the block period is still active
+    if ($isFromPreviousDay && empty($record['time_out']) && in_array($record['status'], ['ongoing', 'pending_exception'])) {
+        if ($hasSchedule && $scheduleEnd) {
+            // For a cross-day shift record from date X:
+            //   Regular block ends on: X+1 at scheduleEnd (e.g., March 4 at 05:00 AM)
+            //   Overtime block ends on: X+1 at scheduleEnd + 4 hours (e.g., March 4 at 09:00 AM)
+            // Compare the full end datetime against NOW to determine if expired.
+            
+            $endParts = explode(':', $scheduleEnd);
+            $endH = (int)$endParts[0];
+            $endM = (int)($endParts[1] ?? 0);
+
+            // The shift ends on the day AFTER the attendance_date
+            $shiftEndDt = new DateTime($recDate, $manilaTz);
+            $shiftEndDt->modify('+1 day');
+            $shiftEndDt->setTime($endH, $endM, 0);
+
+            if ($record['block_type'] === 'overtime') {
+                $shiftEndDt->modify('+4 hours');
+            }
+
+            // If NOW is past the shift end datetime, this record is expired — skip it
+            if ($nowManila >= $shiftEndDt) {
+                continue; // Don't show this stale record
+            }
+        } else {
+            // No schedule info — can't determine if still active, skip to be safe
+            continue;
+        }
+    }
+
+    // Only add if this block_type slot isn't already filled by a today record
+    // (query is ordered by attendance_date DESC, so today's records come first)
+    if (!isset($recordedBlocks[$record['block_type']])) {
+        $recordedBlocks[$record['block_type']] = [
+            'status' => $record['status'],
+            'time_in' => $record['time_in'],
+            'time_out' => $record['time_out'],
+            'missing_timeout_flagged' => !empty($record['missing_timeout_flagged_at']),
+            'request_status' => $record['request_status'] ?? null
+        ];
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -1029,6 +1073,12 @@ foreach ($todayAttendance as $record) {
                 const timeString = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: false });
                 const [h, m, s] = timeString.split(':').map(Number);
                 const currentHour = h + (m / 60);
+                
+                // Get current date in Manila timezone
+                const currentDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+                const currentDay = currentDate.getDate();
+                const currentMonth = currentDate.getMonth() + 1;
+                const currentYear = currentDate.getFullYear();
 
                 <?php if ($hasSchedule): ?>
                     const scheduleStartParts = '<?php echo $scheduleStart; ?>'.split(':').map(Number);
@@ -1036,14 +1086,13 @@ foreach ($todayAttendance as $record) {
                     const scheduleStartHour = scheduleStartParts[0] + (scheduleStartParts[1] / 60);
                     const scheduleEndHour = scheduleEndParts[0] + (scheduleEndParts[1] / 60);
                     const overtimeEndHour = scheduleEndHour + 4;
-                    const earlyStartHour = scheduleStartHour - 0.5; // 30 min before schedule start
                     
                     // Detect if this is a cross-day shift (end time < start time)
                     const isCrossDayShift = scheduleEndHour < scheduleStartHour;
                     
                     const blocks = {
                         'regular': { 
-                            start: earlyStartHour, 
+                            start: scheduleStartHour,  // Strict: no early time-in allowed
                             end: scheduleEndHour,
                             isCrossDay: isCrossDayShift
                         },
@@ -1102,13 +1151,40 @@ foreach ($todayAttendance as $record) {
                             btn.style.cursor = 'default';
                             updateStatusBadge(btn, 'Completed', 'completed');
                         } else {
-                            // Ongoing - show Time Out button
-                            btn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Time Out';
-                            btn.style.background = '#dc3545';
-                            btn.disabled = false;
-                            btn.style.cursor = 'pointer';
-                            btn.setAttribute('data-action', 'time_out');
-                            updateStatusBadge(btn, 'In Progress', 'in-progress');
+                            // Ongoing - determine if the block period has ended
+                            let blockPeriodEnded = false;
+                            
+                            if (range.isCrossDay) {
+                                if (block === 'regular') {
+                                    // Cross-day regular: ended if we're in the gap (after end, before start)
+                                    blockPeriodEnded = (currentHour >= range.end && currentHour < range.start);
+                                } else {
+                                    // Cross-day overtime: ended if past overtime end and before next shift start
+                                    blockPeriodEnded = (currentHour >= range.end && currentHour < scheduleStartHour);
+                                }
+                            } else {
+                                // Same-day: ended if current time is past the block end
+                                blockPeriodEnded = (currentHour >= range.end);
+                            }
+                            
+                            if (blockPeriodEnded) {
+                                // Block period has ended - disable button and show tooltip
+                                btn.innerHTML = '<i class="fas fa-ban"></i> Timeout Ended';
+                                btn.style.background = '#6c757d';
+                                btn.disabled = true;
+                                btn.style.cursor = 'not-allowed';
+                                btn.title = 'Block period has ended. You cannot time out after the block has ended. Please submit a missing timeout request in the "Missing Timeouts" page.';
+                                updateStatusBadge(btn, 'Missing Time-Out', 'missing-timeout');
+                            } else {
+                                // Block period still active - show Time Out button
+                                btn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Time Out';
+                                btn.style.background = '#dc3545';
+                                btn.disabled = false;
+                                btn.style.cursor = 'pointer';
+                                btn.title = '';
+                                btn.setAttribute('data-action', 'time_out');
+                                updateStatusBadge(btn, 'In Progress', 'in-progress');
+                            }
                         }
                     } else {
                         // No record - Standard Time In Logic
@@ -1123,40 +1199,55 @@ foreach ($todayAttendance as $record) {
                             continue;
                         }
 
-                        // Handle cross-day shift logic
+                        // FIX: Properly scoped variables for each block iteration
                         let isWithinTimeRange = false;
                         let isTimeEnded = false;
                         
                         if (range.isCrossDay) {
-                            // For cross-day shifts (e.g., 21:00 to 06:00)
+                            // Cross-day shift logic (e.g., 21:00 → 05:00)
+                            // The shift spans two calendar days. We need to determine
+                            // where the current time falls relative to the shift boundaries.
+                            
                             if (block === 'regular') {
-                                // Regular block: from early start to midnight, then from midnight to end time
+                                // Regular block spans: earlyStart → midnight → end
+                                // Active window: currentHour >= earlyStart (evening) OR currentHour < end (morning)
                                 if (currentHour >= range.start || currentHour < range.end) {
                                     isWithinTimeRange = true;
                                 }
-                                // Block ends only when we pass the end time AND we're in the "ended window" (after end time but before start time on the same day cycle)
-                                // For cross-day, this means after 6:00 AM but before 8:30 PM
-                                if (currentHour >= range.end && currentHour < range.start && currentHour > 12) {
-                                    isTimeEnded = true;
+                                
+                                // Gap period: after end (morning) and before start (evening)
+                                // This is the daytime gap where the shift has ended
+                                // e.g., for 21:00→05:00 shift: gap is 05:00 to 20:30 (earlyStart)
+                                if (currentHour >= range.end && currentHour < range.start) {
+                                    isWithinTimeRange = false;
+                                    // Only show "Ended" if we're in the first half of the gap
+                                    // (i.e., morning/afternoon after the shift ended)
+                                    // Show "Not Started" if we're closer to the next shift start
+                                    if (currentHour < (range.start - 2)) {
+                                        // More than 2 hours before next shift start - show Ended
+                                        isTimeEnded = true;
+                                    }
+                                    // Otherwise show "Not Started" (close to next shift)
                                 }
                             } else if (block === 'overtime') {
-                                // Overtime block: from schedule end to midnight, then from midnight to overtime end
-                                // For cross-day shifts, overtime starts at 6:00 AM (schedule end) and goes to 10:00 AM
+                                // Overtime for cross-day: starts at schedule end (morning) 
+                                // and goes for 4 more hours
+                                // e.g., 05:00 → 09:00
                                 if (currentHour >= range.start && currentHour < range.end) {
                                     isWithinTimeRange = true;
                                 }
-                                // Overtime ends when we pass the overtime end time (after 10:00 AM)
-                                if (currentHour >= range.end) {
+                                if (currentHour >= range.end && currentHour < scheduleStartHour) {
                                     isTimeEnded = true;
                                 }
                             }
                         } else {
-                            // Regular same-day logic
+                            // Same-day shift logic (e.g., 07:30 → 17:00)
                             if (currentHour > range.end) {
                                 isTimeEnded = true;
                             } else if (currentHour >= range.start) {
                                 isWithinTimeRange = true;
                             }
+                            // If before range.start, both flags stay false → "Not Started"
                         }
 
                         if (isTimeEnded) {
@@ -1230,7 +1321,7 @@ foreach ($todayAttendance as $record) {
                             // Show hours worked if available
                             let message = data.message;
                             if (data.hours_worked !== undefined) {
-                                message += `\n\n📊 ${blockName} Summary:\nHours Worked: ${data.hours_worked} hours`;
+                                message += `\n\n ${blockName} Summary:\nHours Worked: ${data.hours_worked} hours`;
                             }
 
                             alert(message);

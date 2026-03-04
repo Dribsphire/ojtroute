@@ -360,6 +360,18 @@ class StudentService
     }
 
     /**
+     * Check if a schedule is a cross-day (night) shift
+     * A cross-day shift has an end time earlier than its start time (e.g., 21:00 -> 05:00)
+     * @param string $startTime HH:MM:SS
+     * @param string $endTime HH:MM:SS
+     * @return bool
+     */
+    public function isCrossDayShift($startTime, $endTime)
+    {
+        return $endTime < $startTime;
+    }
+
+    /**
      * Update student schedule
      * @param int $userId User ID from session
      * @param string $startTime Start time in HH:MM format
@@ -920,13 +932,74 @@ class StudentService
             return ['success' => false, 'message' => 'Please set your working schedule in your profile before recording attendance.'];
         }
 
+        // FIX: Check for any existing ongoing (uncompleted) attendance record
+        // This prevents duplicate shifts when a student forgot to time out from a previous shift
+        $stmtOngoing = $this->db->prepare("
+            SELECT id, attendance_date, block_type, time_in
+            FROM attendance_records
+            WHERE student_id = ?
+            AND time_out IS NULL
+            AND status = 'ongoing'
+            ORDER BY time_in DESC
+            LIMIT 1
+        ");
+        $stmtOngoing->execute([$studentId]);
+        $ongoingRecord = $stmtOngoing->fetch();
+
+        if ($ongoingRecord) {
+            // There's an uncompleted shift - determine if it has actually expired
+            $ongoingTimeIn = new \DateTime($ongoingRecord['time_in'], $phpTimezone);
+            $isCrossDay = $this->isCrossDayShift($workplace['schedule_start_time'], $workplace['schedule_end_time']);
+
+            // Calculate when the ongoing shift's block should have ended
+            $ongoingDate = $ongoingRecord['attendance_date'];
+            if ($ongoingRecord['block_type'] === 'regular') {
+                $blockEndDt = new \DateTime($ongoingDate . ' ' . $workplace['schedule_end_time'], $phpTimezone);
+                if ($isCrossDay) {
+                    $blockEndDt->modify('+1 day');
+                }
+            } else {
+                // overtime
+                $blockEndDt = new \DateTime($ongoingDate . ' ' . $workplace['schedule_end_time'], $phpTimezone);
+                if ($isCrossDay) {
+                    $blockEndDt->modify('+1 day');
+                }
+                $blockEndDt->modify('+4 hours');
+            }
+
+            if ($now < $blockEndDt) {
+                // The ongoing shift hasn't expired yet - block the new time-in
+                return [
+                    'success' => false,
+                    'message' => 'You still have an active shift from ' . $ongoingTimeIn->format('M j, g:i A') . '. Please time out first before starting a new shift.'
+                ];
+            }
+            // If the ongoing shift has expired (forgotten timeout), allow the student to time in.
+            // The expired record will remain for the Missing Timeouts flow where the student
+            // can submit a request to get those hours validated by their instructor.
+        }
+
         // Determine block type from schedule instead of client input
         $scheduleStart = new \DateTime($currentDate . ' ' . $workplace['schedule_start_time'], $phpTimezone);
         $scheduleEnd = new \DateTime($currentDate . ' ' . $workplace['schedule_end_time'], $phpTimezone);
         
         // Handle night shift: if end time is earlier than start time, it means end time is next day
-        if ($scheduleEnd < $scheduleStart) {
-            $scheduleEnd->modify('+1 day');
+        $isCrossDay = $this->isCrossDayShift($workplace['schedule_start_time'], $workplace['schedule_end_time']);
+        if ($isCrossDay) {
+            // If current time is in the morning portion of a cross-day shift (before end time),
+            // the shift actually started yesterday, so adjust schedule start to yesterday
+            $endHour = (int) explode(':', $workplace['schedule_end_time'])[0];
+            $startHour = (int) explode(':', $workplace['schedule_start_time'])[0];
+            $currentHour = (int) $now->format('H');
+            
+            if ($currentHour < $endHour || ($currentHour < $startHour && $currentHour < 12)) {
+                // We're in the morning portion - shift started yesterday
+                $scheduleStart->modify('-1 day');
+                // scheduleEnd stays on current date (already correct)
+            } else {
+                // We're in the evening portion - shift ends tomorrow
+                $scheduleEnd->modify('+1 day');
+            }
         }
         
         $actualBlockType = ($now >= $scheduleEnd) ? 'overtime' : 'regular';
@@ -945,13 +1018,14 @@ class StudentService
             }
         }
 
-        // Check if regular block hasn't started yet
+        // Block regular time-in if schedule has not started yet (strict - no early allowance)
         if ($blockType === 'regular') {
-            // Allow time-in starting 30 minutes before schedule start
-            $earlyStart = clone $scheduleStart;
-            $earlyStart->modify('-30 minutes');
-            if ($now < $earlyStart) {
-                return ['success' => false, 'message' => 'Your shift has not started yet. You can time in starting 30 minutes before your scheduled start time.'];
+            if ($now < $scheduleStart) {
+                return ['success' => false, 'message' => 'Your shift has not started yet. Please wait until your scheduled start time (' . $scheduleStart->format('g:i A') . ').'];
+            }
+            // Block regular time-in if schedule end has already passed
+            if ($now >= $scheduleEnd) {
+                return ['success' => false, 'message' => 'Your regular shift schedule has ended. You cannot time in after ' . $scheduleEnd->format('g:i A') . '.'];
             }
         }
 
@@ -984,7 +1058,22 @@ class StudentService
         file_put_contents($dir . $filename, $data);
         $photoPath = '../../storage/uploads/attendance_images/' . $filename;
 
-        // 4. Insert Record with explicit Philippine timezone values
+        // 4. Determine the correct attendance_date (shift date, not calendar date)
+        // For cross-day shifts in the morning portion, the shift date is yesterday
+        $attendanceDate = $currentDate;
+        if ($isCrossDay) {
+            $currentHourNow = (int) $now->format('H');
+            $endH = (int) explode(':', $workplace['schedule_end_time'])[0];
+            $startH = (int) explode(':', $workplace['schedule_start_time'])[0];
+            if ($currentHourNow < $endH || ($currentHourNow < $startH && $currentHourNow < 12)) {
+                // Morning portion of cross-day shift - attendance belongs to yesterday
+                $yesterdayDt = clone $now;
+                $yesterdayDt->modify('-1 day');
+                $attendanceDate = $yesterdayDt->format('Y-m-d');
+            }
+        }
+
+        // Insert Record with explicit Philippine timezone values
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO attendance_records 
@@ -994,7 +1083,7 @@ class StudentService
             ");
             $stmt->execute([
                 ':sid' => $studentId,
-                ':date' => $currentDate,
+                ':date' => $attendanceDate,
                 ':block' => $blockType,
                 ':time_in' => $currentTime,
                 ':lat' => $lat,
@@ -1038,13 +1127,17 @@ class StudentService
         $this->db->beginTransaction();
 
         try {
-            // 1. Get existing attendance record with row lock to prevent concurrent modifications
+            // 1. Find the active ongoing attendance record for this block type
+            // FIX: Search by ongoing status instead of CURDATE() only, so cross-day shifts are found
             $stmt = $this->db->prepare("
                 SELECT id, time_in, time_out, status, block_type, attendance_date
                 FROM attendance_records 
                 WHERE student_id = ? 
-                AND attendance_date = CURDATE() 
                 AND block_type = ?
+                AND time_out IS NULL
+                AND status = 'ongoing'
+                ORDER BY time_in DESC
+                LIMIT 1
                 FOR UPDATE
             ");
             $stmt->execute([$studentId, $blockType]);
@@ -1052,7 +1145,7 @@ class StudentService
 
             if (!$record) {
                 $this->db->rollBack();
-                return ['success' => false, 'message' => 'No Time In record found for this block today.'];
+                return ['success' => false, 'message' => 'No active Time In record found for this block.'];
             }
 
             if ($record['time_out']) {
@@ -1062,52 +1155,60 @@ class StudentService
 
             // 2. Get student schedule for dynamic block end times
             $scheduleStmt = $this->db->prepare("
-            SELECT schedule_start_time, schedule_end_time
-            FROM student_workplaces
-            WHERE student_id = ? AND is_active = 1
-            LIMIT 1
-        ");
+                SELECT schedule_start_time, schedule_end_time
+                FROM student_workplaces
+                WHERE student_id = ? AND is_active = 1
+                LIMIT 1
+            ");
             $scheduleStmt->execute([$studentId]);
             $schedule = $scheduleStmt->fetch();
 
-            // Determine block end time dynamically from schedule
-            $blockEndTime = null;
+            // Determine block end DATETIME dynamically from schedule (not just time)
+            $blockEndDateTime = null;
             if ($schedule && $schedule['schedule_end_time']) {
+                $isCrossDay = $this->isCrossDayShift($schedule['schedule_start_time'], $schedule['schedule_end_time']);
+                $attendanceDate = $record['attendance_date'];
+
                 if ($blockType === 'regular') {
-                    $blockEndTime = $schedule['schedule_end_time'];
+                    $blockEndDateTime = new \DateTime($attendanceDate . ' ' . $schedule['schedule_end_time'], new \DateTimeZone('Asia/Manila'));
+                    // For cross-day shifts, the end time is on the next calendar day
+                    if ($isCrossDay) {
+                        $blockEndDateTime->modify('+1 day');
+                    }
                 } elseif ($blockType === 'overtime') {
                     // Overtime ends 4 hours after schedule end
-                    $endDt = new \DateTime($schedule['schedule_end_time']);
-                    $endDt->modify('+4 hours');
-                    $blockEndTime = $endDt->format('H:i:s');
+                    $blockEndDateTime = new \DateTime($attendanceDate . ' ' . $schedule['schedule_end_time'], new \DateTimeZone('Asia/Manila'));
+                    if ($isCrossDay) {
+                        $blockEndDateTime->modify('+1 day');
+                    }
+                    $blockEndDateTime->modify('+4 hours');
                 }
             }
 
             // Fallback for legacy block types (morning/afternoon/overtime)
-            if (!$blockEndTime) {
+            if (!$blockEndDateTime) {
                 $legacyEndTimes = [
                     'morning' => '12:00:00',
                     'afternoon' => '18:00:00',
                     'overtime' => '22:00:00'
                 ];
-                $blockEndTime = $legacyEndTimes[$blockType] ?? null;
+                $legacyEnd = $legacyEndTimes[$blockType] ?? null;
+                if ($legacyEnd) {
+                    $blockEndDateTime = new \DateTime($record['attendance_date'] . ' ' . $legacyEnd, new \DateTimeZone('Asia/Manila'));
+                }
             }
 
-            if (!$blockEndTime) {
+            if (!$blockEndDateTime) {
                 $this->db->rollBack();
                 return ['success' => false, 'message' => 'Invalid block type.'];
             }
 
             // Get current time in Asia/Manila timezone
             $currentDateTime = new \DateTime('now', new \DateTimeZone('Asia/Manila'));
-            $currentTime = $currentDateTime->format('H:i:s');
-            $currentDate = $currentDateTime->format('Y-m-d');
 
-            // Check if we're past the block end time
-            if (
-                $currentDate > $record['attendance_date'] ||
-                ($currentDate === $record['attendance_date'] && $currentTime > $blockEndTime)
-            ) {
+            // FIX: Compare full datetimes instead of separate date/time strings
+            // This correctly handles cross-day shifts
+            if ($currentDateTime > $blockEndDateTime) {
                 $this->db->rollBack();
                 return [
                     'success' => false,
@@ -1243,6 +1344,8 @@ class StudentService
     }
     /**
      * Get today's attendance records for a student
+     * FIX: Also fetches yesterday's ongoing (uncompleted) records for cross-day shifts,
+     * and includes missing_timeout_flagged_at and request_status columns.
      * @param int $studentId
      * @return array
      */
@@ -1250,9 +1353,19 @@ class StudentService
     {
         try {
             $stmt = $this->db->prepare("
-                SELECT block_type, time_in, time_out, status, within_radius
+                SELECT block_type, time_in, time_out, status, within_radius,
+                       missing_timeout_flagged_at, request_status, attendance_date
                 FROM attendance_records
-                WHERE student_id = ? AND attendance_date = CURDATE()
+                WHERE student_id = ?
+                AND (
+                    attendance_date = CURDATE()
+                    OR (
+                        attendance_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+                        AND time_out IS NULL
+                        AND status IN ('ongoing', 'pending_exception')
+                    )
+                )
+                ORDER BY attendance_date DESC, time_in DESC
             ");
             $stmt->execute([$studentId]);
             return $stmt->fetchAll();
@@ -1265,6 +1378,10 @@ class StudentService
     public function getMissingTimeouts($studentId)
     {
         try {
+            // FIX: For cross-day shifts, a record from yesterday with end time in the morning
+            // should only be shown as "missing" after that morning end time has passed.
+            // We check: if schedule_end < schedule_start (cross-day), the effective end datetime
+            // is attendance_date + 1 day + schedule_end_time.
             $stmt = $this->db->prepare("
                 SELECT ar.*,
                        ar.attendance_date,
@@ -1274,27 +1391,25 @@ class StudentService
                        ar.forgot_timeout_file    AS letter_file_path,
                        ar.request_status         AS status,
                        ar.instructor_response,
+                       sw.schedule_start_time,
                        sw.schedule_end_time
                 FROM attendance_records ar
                 LEFT JOIN student_workplaces sw
                        ON sw.student_id = ar.student_id
                       AND sw.is_active = 1
                 WHERE ar.student_id = ?
-                  AND ar.time_in   IS NOT NULL     -- must have timed in
-                  AND ar.time_out  IS NULL          -- must NOT have timed out
+                  AND ar.time_in   IS NOT NULL
+                  AND ar.time_out  IS NULL
                   AND (
-                        -- Already submitted: always show so student can track feedback
                         ar.request_status IS NOT NULL
 
                         OR (
-                            -- Past days: session is definitely over
-                            ar.attendance_date < CURDATE()
-
-                            OR (
-                                -- Today: only show if the scheduled end time has passed
-                                ar.attendance_date = CURDATE()
-                                AND TIME(NOW()) > COALESCE(sw.schedule_end_time, '18:00:00')
-                            )
+                            CASE
+                                WHEN sw.schedule_end_time < sw.schedule_start_time THEN
+                                    NOW() > CONCAT(DATE_ADD(ar.attendance_date, INTERVAL 1 DAY), ' ', COALESCE(sw.schedule_end_time, '18:00:00'))
+                                ELSE
+                                    NOW() > CONCAT(ar.attendance_date, ' ', COALESCE(sw.schedule_end_time, '18:00:00'))
+                            END
                         )
                   )
                 ORDER BY ar.attendance_date DESC, ar.block_type ASC

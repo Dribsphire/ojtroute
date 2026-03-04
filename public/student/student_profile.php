@@ -1301,13 +1301,12 @@ $hasPendingRequest = $hasWorkplace ? $studentService->hasPendingWorkplaceRequest
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label class="form-label" for="scheduleStartTime">Start Time</label>
                                 <input type="time" id="scheduleStartTime" name="schedule_start_time" class="form-input"
-                                    required min="05:00" max="22:00"
+                                    required
                                     value="<?php echo $scheduleIsSet ? date('H:i', strtotime($scheduleStart)) : ''; ?>">
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label class="form-label" for="scheduleEndTime">End Time</label>
                                 <input type="time" id="scheduleEndTime" name="schedule_end_time" class="form-input" required
-                                    min="05:00" max="22:00"
                                     value="<?php echo $scheduleIsSet ? date('H:i', strtotime($scheduleEnd)) : ''; ?>">
                             </div>
                         </div>
@@ -1324,7 +1323,14 @@ $hasPendingRequest = $hasWorkplace ? $studentService->hasPendingWorkplaceRequest
                             const endTime = document.getElementById('scheduleEndTime').value;
                             if (!startTime || !endTime) { alert('Please fill in both start and end times.'); return; }
                             if (startTime === endTime) { alert('Start and end time cannot be the same.'); return; }
-                            if (!confirm('Are you sure you want to <?php echo $scheduleIsSet ? "update" : "set"; ?> this schedule?\n\nStart: ' + startTime + '\nEnd: ' + endTime)) return;
+                            // Convert 24h time to 12h format for display
+                            function formatTime12h(time24) {
+                                const [h, m] = time24.split(':').map(Number);
+                                const period = h >= 12 ? 'PM' : 'AM';
+                                const hour12 = h % 12 || 12;
+                                return hour12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+                            }
+                            if (!confirm('Are you sure you want to <?php echo $scheduleIsSet ? "update" : "set"; ?> this schedule?\n\nStart: ' + formatTime12h(startTime) + '\nEnd: ' + formatTime12h(endTime))) return;
                             const btn = document.getElementById('saveScheduleBtn');
                             btn.disabled = true;
                             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';

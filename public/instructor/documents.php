@@ -84,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $professionalPresentationPoints = isset($_POST['professionalPresentationPoints']) && $_POST['professionalPresentationPoints'] !== '' ? floatval($_POST['professionalPresentationPoints']) : null;
         $result = $instructorService->updateSubmissionStatus($subId, $status, $feedback, $points, $accuracyQualityPoints, $professionalPresentationPoints);
 
-        // Send email notification to student
-        if ($result['success']) {
+        // Send email notification to student (skip for 'pending' — no need to notify)
+        if ($result['success'] && $status !== 'pending') {
             try {
                 require_once '../../app/services/EmailService.php';
                 $config = require __DIR__ . '/../../config/database.php';
@@ -106,7 +106,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 if ($info && !empty($info['email'])) {
                     $emailService = new \App\Services\EmailService();
-                    $statusLabel = ucfirst($status);
+                    $statusLabels = [
+                        'approved' => 'Approved',
+                        'revise' => 'Needs Revision',
+                        'rejected' => 'Rejected'
+                    ];
+                    $statusLabel = $statusLabels[$status] ?? ucfirst($status);
                     $statusColors = [
                         'approved' => '#22c55e',
                         'revise' => '#4da6ff',
